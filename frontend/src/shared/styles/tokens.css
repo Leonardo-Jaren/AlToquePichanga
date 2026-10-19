@@ -1,0 +1,77 @@
+/* Tokens oficiales de AlToque Pichanga - AGENTS.md Anexo A */
+
+:root {
+  color-scheme: light;
+  /* Marca principal (constante en ambos temas) */
+  --brand-lime: #C0FA04;
+  --brand-lime-hover: #A9DC00;
+  --brand-lime-pressed: #8FBB00;
+  --brand-lime-light: #F0FBCB;
+  --brand-lime-dark: #263710;
+  --brand-charcoal: #0B0F12;
+  --brand-white: #FFFFFF;
+  --on-brand-lime: #0B0F12;
+
+  /* Tipografías */
+  --font-display: 'Archivo Black', sans-serif;
+  --font-body: 'Outfit', sans-serif;
+
+  /* Modo Claro por defecto */
+  --bg: #F6F8FA;
+  --surface: #FFFFFF;
+  --surface-2: #EEF2F5;
+  --surface-3: #E6ECEF;
+  --nav-bg: #FFFFFF;
+  --input-bg: #FFFFFF;
+  --text: #111827;
+  --text-muted: #526171;
+  --text-subtle: #687889;
+  --border: #DEE5EB;
+  --border-strong: #BCC8D0;
+  --link: #4E6800;
+  --selection-bg: #F0FBCB;
+  --hero-bg: #0B0F12;
+  --hero-text: #FFFFFF;
+  --shadow: 0 8px 28px rgba(11, 15, 18, 0.08);
+
+  /* Colores de estado - Claro */
+  --status-success-text: #176A4C;
+  --status-success-bg: #E0F7EC;
+  --status-warning-text: #875A00;
+  --status-warning-bg: #FFF1CC;
+  --status-danger-text: #AD3140;
+  --status-danger-bg: #FFE8EC;
+  --status-info-text: #225CA8;
+  --status-info-bg: #E7F0FF;
+}
+
+/* Modo Oscuro */
+html[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #0B0F12;
+  --surface: #141B20;
+  --surface-2: #1B252C;
+  --surface-3: #26323A;
+  --nav-bg: #10161B;
+  --input-bg: #182128;
+  --text: #F6F8FA;
+  --text-muted: #A8B4BE;
+  --text-subtle: #91A0AD;
+  --border: #2D3A44;
+  --border-strong: #485964;
+  --link: #D8FF7D;
+  --selection-bg: #263710;
+  --hero-bg: #10191D;
+  --hero-text: #FFFFFF;
+  --shadow: 0 12px 36px rgba(0, 0, 0, 0.28);
+
+  /* Colores de estado - Oscuro */
+  --status-success-text: #6CE2AF;
+  --status-success-bg: #13392C;
+  --status-warning-text: #FFD77E;
+  --status-warning-bg: #3A2B12;
+  --status-danger-text: #FF8C96;
+  --status-danger-bg: #401F28;
+  --status-info-text: #80B8FF;
+  --status-info-bg: #182F4A;
+}

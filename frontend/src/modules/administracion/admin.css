@@ -1,0 +1,117 @@
+.admin-topbar {
+  background: var(--nav-bg);
+  border-bottom: 1px solid var(--border);
+}
+.admin-brand-link { display: inline-flex; align-items: center; gap: 12px; min-width: 0; }
+.admin-logo { width: auto; height: 44px; max-width: 76px; object-fit: contain; }
+.admin-logo-dark { display: none; }
+html[data-theme='dark'] .admin-logo-light { display: none; }
+html[data-theme='dark'] .admin-logo-dark { display: block; }
+
+.admin-sidebar {
+  align-self: start;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  padding: 16px;
+}
+
+.admin-nav { display: grid; gap: 8px; }
+.admin-nav-link {
+  min-height: 44px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  background: transparent;
+  color: var(--text-muted);
+  text-align: left;
+  font: 500 15px var(--font-body);
+  cursor: pointer;
+}
+.admin-nav-link:hover { background: var(--surface-2); color: var(--text); }
+.admin-nav-link-active {
+  border-color: var(--border);
+  background: var(--selection-bg);
+  color: var(--text);
+  font-weight: 700;
+}
+.admin-nav-line { height: 24px; width: 3px; border-radius: 99px; background: var(--brand-lime); }
+.admin-page-heading {
+  position: relative;
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 24px;
+  padding: 6px 0 6px 16px;
+}
+.admin-field-mark {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  border-radius: 99px;
+  background: var(--brand-lime);
+}
+.admin-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  padding: 20px;
+}
+.admin-button {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  padding: 8px 16px;
+  font: 600 14px var(--font-body);
+  cursor: pointer;
+  transition: background-color 180ms ease, border-color 180ms ease;
+}
+.admin-button:focus-visible, .admin-nav-link:focus-visible, .admin-field:focus-visible {
+  outline: 3px solid var(--brand-lime);
+  outline-offset: 3px;
+}
+.admin-button:disabled { cursor: not-allowed; opacity: .55; }
+.admin-button-primary { background: var(--brand-lime); color: var(--on-brand-lime); }
+.admin-button-primary:hover { background: var(--brand-lime-hover); }
+.admin-button-secondary { border-color: var(--border-strong); background: var(--surface); color: var(--text); }
+.admin-button-secondary:hover { background: var(--surface-2); }
+.admin-button-quiet { border-color: var(--border); background: var(--surface); color: var(--text); }
+.admin-button-danger { border-color: var(--status-danger-text); background: var(--status-danger-bg); color: var(--status-danger-text); }
+.admin-field {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--input-bg);
+  color: var(--text);
+  padding: 9px 12px;
+  font: 400 15px var(--font-body);
+}
+.admin-field::placeholder { color: var(--text-muted); }
+.admin-label { display: block; margin-bottom: 6px; font-size: 14px; font-weight: 600; }
+.admin-error { border-radius: var(--radius-md); background: var(--status-danger-bg); color: var(--status-danger-text); padding: 12px 14px; }
+.admin-success { border-radius: var(--radius-md); background: var(--status-success-bg); color: var(--status-success-text); padding: 12px 14px; }
+.admin-state { display: inline-flex; align-items: center; border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 700; }
+.admin-state-success { color: var(--status-success-text); background: var(--status-success-bg); }
+.admin-state-warning { color: var(--status-warning-text); background: var(--status-warning-bg); }
+.admin-state-danger { color: var(--status-danger-text); background: var(--status-danger-bg); }
+.admin-state-info { color: var(--status-info-text); background: var(--status-info-bg); }
+.admin-row-card { display: grid; gap: 12px; border-bottom: 1px solid var(--border); padding: 16px 0; }
+@media (max-width: 1023px) {
+  .admin-nav { display: none; }
+  .admin-nav.admin-nav-open { display: grid; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .admin-button { transition: none; }
+}

@@ -1,0 +1,47 @@
+@import "tailwindcss";
+@import "./shared/styles/tokens.css";
+@import "./shared/styles/cuenta.css";
+
+@theme {
+  --color-brand-lime: var(--brand-lime);
+  --color-brand-lime-hover: var(--brand-lime-hover);
+  --color-brand-lime-pressed: var(--brand-lime-pressed);
+  --color-brand-lime-light: var(--brand-lime-light);
+  --color-brand-lime-dark: var(--brand-lime-dark);
+  --color-brand-charcoal: var(--brand-charcoal);
+  --color-brand-white: var(--brand-white);
+  --color-on-brand-lime: var(--on-brand-lime);
+
+  --color-app-bg: var(--bg);
+  --color-app-surface: var(--surface);
+  --color-app-surface-2: var(--surface-2);
+  --color-app-surface-3: var(--surface-3);
+  --color-app-nav-bg: var(--nav-bg);
+  --color-app-input-bg: var(--input-bg);
+  --color-app-text: var(--text);
+  --color-app-text-muted: var(--text-muted);
+  --color-app-text-subtle: var(--text-subtle);
+  --color-app-border: var(--border);
+  --color-app-border-strong: var(--border-strong);
+  --color-app-link: var(--link);
+  --color-app-selection-bg: var(--selection-bg);
+  --color-app-hero-bg: var(--hero-bg);
+  --color-app-hero-text: var(--hero-text);
+
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+}
+
+body {
+  font-family: var(--font-body);
+  background-color: var(--bg);
+  color: var(--text);
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+.font-display {
+  font-family: var(--font-display);
+}

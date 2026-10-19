@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="referrer" content="same-origin" />
+    <script>
+      try {
+        const preference = localStorage.getItem('altoque-theme') || 'system'
+        const dark = preference === 'dark' || (preference === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light'
+        document.documentElement.classList.add(dark ? 'dark' : 'light')
+      } catch { document.documentElement.dataset.theme = 'light' }
+    </script>
+    <!-- Favicon e ícono de la pestaña (100% transparente sin fondo) -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico?v=3" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png?v=3" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon.png?v=3" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=3" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AlToque Pichanga — Tu pichanga, al toque</title>
+    <!-- Google Fonts: Archivo Black & Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Outfit:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

@@ -1,0 +1,17 @@
+/* Controles compartidos de cuenta; colores derivados del manual oficial. */
+.account-card { background: var(--surface); border: 1px solid var(--border); border-radius: 24px; padding: 32px; box-shadow: var(--shadow); min-width: 0; }
+.account-input { width: 100%; min-height: 48px; border: 1px solid var(--border-strong); border-radius: 12px; padding: 10px 12px; background: var(--input-bg); color: var(--text); font: inherit; }
+.account-input[aria-invalid='true'] { border-color: var(--status-danger-text); }
+.account-primary, .account-secondary { min-height: 44px; padding: 12px 20px; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; text-align: center; transition: background-color .15s; }
+.account-primary { background: var(--brand-lime); color: var(--on-brand-lime); border: 1px solid transparent; }
+.account-primary:hover { background: var(--brand-lime-hover); }
+.account-primary:active { background: var(--brand-lime-pressed); }
+.account-secondary { background: var(--surface-2); color: var(--text); border: 1px solid var(--border-strong); display: inline-flex; align-items: center; justify-content: center; }
+.account-secondary:hover { background: var(--surface-3); }
+.account-primary:disabled, .account-secondary:disabled { opacity: .6; cursor: not-allowed; }
+.account-error { background: var(--status-danger-bg); color: var(--status-danger-text); padding: 12px; border-radius: 8px; font-size: 14px; overflow-wrap: anywhere; }
+.account-success { background: var(--status-success-bg); color: var(--status-success-text); padding: 12px; border-radius: 8px; font-size: 14px; }
+:focus-visible { outline: 3px solid var(--brand-lime); outline-offset: 3px; }
+.font-display { font-weight: 400; }
+@media (max-width: 640px) { .account-card { padding: 24px; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 0s !important; animation-duration: 0s !important; } }
