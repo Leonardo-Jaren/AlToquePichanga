@@ -40,6 +40,13 @@ export const useEmpresasStore = defineStore('empresas', () => {
     else localStorage.removeItem(CLAVE_EMPRESA)
   }
 
+  function limpiar() {
+    lista.value = []
+    cargando.value = false
+    error.value = ''
+    seleccionar(null)
+  }
+
   async function registrar(datos) {
     const { data } = await empresasApi.registrar(datos)
     lista.value = [...lista.value, data]
@@ -54,5 +61,5 @@ export const useEmpresasStore = defineStore('empresas', () => {
     return data
   }
 
-  return { lista, activaId, empresaActiva, cargando, error, cargar, seleccionar, registrar, refrescarActiva }
+  return { lista, activaId, empresaActiva, cargando, error, cargar, seleccionar, limpiar, registrar, refrescarActiva }
 })

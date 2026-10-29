@@ -1,4 +1,4 @@
-# Modelo de datos — Fases 1, 2, 3A y 3B
+# Modelo de datos — Fases 1–4C
 
 Se conserva auth.User y AUTH_USER_MODEL. Las tablas y campos nuevos de negocio están en
 español. PostgreSQL compartido aplica restricciones; servicios y repositorios establecen
@@ -126,6 +126,30 @@ debe coincidir con el snapshot solicitado; se crea el periodo histórico y, si e
 es mayor a cero, el PagoSuscripcion independiente. Solicitar o adjuntar una referencia
 nunca activa el servicio. Cambiar el precio de un plan no altera periodos previos.
 
+## Reservas y pagos — Fases 4A y 4C
+
+| Modelo / tabla | Datos y relaciones |
+|---|---|
+| Reserva / reservas | Jugador, cancha, intervalo, duración, total/adelanto `Decimal`, moneda, estado, vencimiento, cotización histórica, clave idempotente |
+| BloqueReserva / reservas_bloques | Reserva y cancha, fecha/hora, liberación; PostgreSQL impide cruces activos por cancha |
+| HistorialEstadoReserva / reservas_historial_estados | Reserva, estado anterior/nuevo, actor, motivo y fecha |
+| MetodoPagoSede / sedes_metodos_pago | Sede, Yape/Plin/transferencia, titular, celular/cuenta/CCI/banco, QR opcional, instrucciones y estado activo |
+| PagoReserva / reservas_pagos | Reserva, medio de su sede, tipo (adelanto/total/saldo), importes Decimal solicitado/verificado, estado, referencia, observaciones, idempotencia, revisor, fechas y conciliación |
+| HistorialPagoReserva / reservas_historial_pagos | Pago, transición, actor, motivo, datos y fecha; se conserva para auditoría |
+
+El alcance empresarial del pago se deriva de `Reserva → Cancha → Sede → Empresa`; no se
+acepta una empresa o sede recibida del cliente como autorización. `PagoReserva` no crea una
+relación con `PagoSuscripcion`: los pagos de reserva y las suscripciones del SaaS permanecen
+separados. Un índice único parcial limita cada reserva a una solicitud en `pendiente_pago` o
+`pendiente_revision`; los servicios y transacciones limitan los pagos aprobados al total
+histórico y requieren cubrir el adelanto mínimo antes de pasar a pendiente de confirmación.
+
+Estados de pago: `pendiente_pago`, `pendiente_revision`, `aprobado`, `rechazado`, `vencido` y
+`pago_tardio`. Declarar el comprobante no verifica el pago. Los pagos vencidos conservan su
+historial; una aprobación que vence antes de la confirmación posterior queda marcada para
+conciliación y libera el bloque. `RESERVA_REVISION_PAGO_MINUTOS` es configurable y provisional;
+`PAGOS_RESERVA_HABILITADOS` está desactivado por defecto fuera de desarrollo.
+
 maximo_sedes, maximo_empleados y maximo_canchas aceptan null y cero. El código interpreta
 null como ausencia de máximo y cero como ningún recurso disponible; confirmar esta
 interpretación comercial sigue pendiente. La cuota de canchas se aplica al total de la
@@ -141,9 +165,9 @@ empresa conforme al supuesto pendiente indicado en la sección Canchas.
 - Una sola solicitud SaaS pendiente por empresa y un solo pago por solicitud.
 - Precio Decimal y no negativo; vencimiento de periodo no anterior a inicio.
 - Sede, imagen, membresía y solicitud usan PROTECT donde se requiere preservar historial.
-- Fase 3A implementa Cancha e ImagenCancha; Fase 3B añade los modelos de horarios y
-  excepciones descritos arriba. Siguen fuera de alcance tarifas, reservas, pagos de
-  jugadores, caja y kiosco.
+- Fase 3A implementa Cancha e ImagenCancha; Fase 3B añade horarios y excepciones.
+  Tarifas se agregaron de forma aditiva en Fase 3C, reservas en Fase 4A y pagos manuales de
+  reservas en Fase 4C. Caja y kiosco continúan fuera de alcance.
 
 Migraciones nuevas, sin reiniciar ni eliminar datos:
 
@@ -154,9 +178,66 @@ Migraciones nuevas, sin reiniciar ni eliminar datos:
 - apps/suscripciones/migrations/0002_alter_plansuscripcion_nombre_and_more.py
 - apps/canchas/migrations/0001_initial.py
 - apps/horarios/migrations/0001_initial.py
+- apps/reservas/migrations/0001_initial.py y `0002_remove_reserva_reserva_estado_valido_and_more.py`
+- apps/pagos/migrations/0001_initial.py
 
 `showmigrations` confirmó las migraciones anteriores aplicadas en la base PostgreSQL
 local de desarrollo. No se reinició ni se eliminó esa base. Las pruebas completas usan
 otra base PostgreSQL temporal y `makemigrations --check --dry-run` no detectó cambios
 faltantes.
 
+
+## Tarifas — Fase 3C
+
+`ReglaTarifa` (`tarifas_reglas`) pertenece a una `Cancha` mediante una relación protegida.
+Una sola estructura representa tarifas `diurna`, `nocturna`, `fin_semana`, `feriado` y
+`especial`; almacena días o fechas aplicables, hora inicial/final o día completo, vigencia,
+precio por hora `Decimal(10,2)`, moneda PEN, estado activo y usuario creador. Desactivar
+preserva el historial.
+
+Las restricciones de base exigen importe mayor a cero, rangos de fecha y hora válidos, tipo
+admitido, PEN como moneda y nombre no vacío único dentro de la cancha. La validación de
+servicio rechaza reglas activas ambiguas de igual prioridad para periodos superpuestos.
+La migración aditiva es `apps/tarifas/migrations/0001_initial.py`; no reinicia, elimina ni
+transforma tablas existentes.
+
+## Publicación de calendario — Fase 3D
+
+`Cancha.publicada` es booleano y usa `False` como valor inicial. No agrega una entidad ni
+modifica relaciones existentes. Su migración aditiva es
+`apps/canchas/migrations/0002_cancha_publicada.py`. Solo una cancha publicada y asociada a
+sede y empresa activas se lista públicamente; las canchas inactivas quedan ocultas y las que
+están en mantenimiento se muestran sin bloques contratables. La consulta pública serializa
+una lista explícita de campos públicos y no reutiliza el serializer administrativo completo.
+
+La disponibilidad conserva `considera_reservas: false`. Las respuestas marcan
+`origen=horario_semanal` o `origen=ampliacion_excepcional`; las reglas de precio y la cotización
+se calculan con los mismos servicios existentes. Ninguna cotización genera una fila de
+reserva o una retención.
+
+## Reservas y bloques de horario — Fase 4A
+
+| Modelo / tabla | Relaciones y datos |
+|---|---|
+| Reserva / reservas | UUID de idempotencia único por jugador, código público aleatorio, usuario jugador, cancha, inicio/fin conscientes de zona, duración, importe y adelanto Decimal(10,2), moneda PEN, estado, vencimiento y snapshot JSON de la tarifa por bloque. Empresa y sede se obtienen por la cancha para evitar relaciones redundantes. |
+| BloqueReserva / reservas_bloques | Reserva, cancha, intervalo de una hora, fecha de creación y liberado_en nullable. Una fila por hora permite reservar varias horas consecutivas y conservar qué intervalo se liberó. |
+| HistorialEstadoReserva / reservas_historial_estados | Estado anterior/nuevo, motivo, responsable nullable y fecha. Preserva auditoría sin editar la historia previa. |
+
+La migración aditiva apps/reservas/migrations/0001_initial.py instala primero la extensión
+PostgreSQL btree_gist. Una restricción GiST excluye intervalos tstzrange('[)')
+superpuestos para la misma cancha cuando liberado_en IS NULL; por eso 19:00–20:00 y
+20:00–21:00 son contiguos válidos, pero 19:00–21:00 y 20:00–22:00 no pueden coexistir.
+transaction.atomic() bloquea la cancha antes de revisar, calcular y crear sus bloques, y la
+restricción de base sigue siendo el último control frente a carreras.
+
+Estados contemplados: retenida, pendiente de pago, pendiente de verificación, confirmada,
+vencida, cancelada, rechazada y finalizada. Durante Fase 4A solo se permiten la creación
+inicial en retenida y las transiciones retenida → vencida o retenida → cancelada; los
+estados de pagos y asistencia quedan inactivos. El servicio que cambia el estado registra
+motivo y responsable y no hay un campo de estado escribible por API.
+
+La retención inicial de 15 minutos se configura mediante RESERVA_RETENCION_MINUTOS; es un
+valor de desarrollo pendiente de definición comercial. La tarea independiente
+expirar_retenciones vence y libera bloques. El endpoint público actualizado declara
+considera_reservas: true y oculta datos del jugador; las consultas operativas de 3B
+conservan false.

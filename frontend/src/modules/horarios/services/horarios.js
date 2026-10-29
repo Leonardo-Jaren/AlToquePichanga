@@ -12,4 +12,7 @@ export const horariosApi = {
   disponibilidad: (canchaId, desde, hasta) => api.get(
     `/canchas/${canchaId}/disponibilidad-operativa/`, { params: { desde, hasta } },
   ),
+  disponibilidadPublica: (canchaId, desde, hasta) => api.get(
+    `/publico/canchas/${canchaId}/disponibilidad/`, { params: { desde, hasta } },
+  ),
 }

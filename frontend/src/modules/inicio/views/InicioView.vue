@@ -51,6 +51,7 @@ onMounted(() => {
         </div>
 
         <div class="flex items-center gap-4">
+          <RouterLink to="/canchas-publicas" class="hidden text-sm font-semibold text-[var(--link)] sm:inline">Horarios y precios</RouterLink>
           <a href="/ingresar" class="text-sm font-semibold text-[var(--link)]">Mi cuenta</a>
           <span class="hidden sm:inline-block text-xs font-medium text-[var(--text-muted)] bg-[var(--surface-2)] px-2.5 py-1 rounded-full border border-[var(--border)]">
             Fase 0 — Inicialización

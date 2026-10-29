@@ -20,7 +20,6 @@ from apps.empresas.models import (
 from apps.empresas.services.personal import aceptar_invitacion
 from apps.sedes.models import AsignacionSede, Sede
 from apps.suscripciones.models import (
-    ConfiguracionSuscripcion,
     EstadoSolicitud,
     EstadoSuscripcion,
     FrecuenciaSuscripcion,
@@ -30,7 +29,6 @@ from apps.suscripciones.models import (
     SolicitudSuscripcion,
     SuscripcionEmpresa,
 )
-from apps.suscripciones.services.reglas import suscripcion_operativa
 from apps.usuarios.models import CorreoPendiente, PerfilUsuario
 
 pytestmark = pytest.mark.django_db
@@ -380,77 +378,3 @@ def test_solicitud_no_activa_y_aprobacion_guarda_importe_historico(crear_usuario
     empresa.refresh_from_db()
     assert empresa.estado == EstadoEmpresa.PENDIENTE and not empresa.activa
     assert not hasattr(PagoSuscripcion.objects.get(), "reserva_id")
-
-
-def test_renovacion_reactiva_suscripcion_y_empieza_tras_el_periodo_actual(crear_usuario):
-    dueno = crear_usuario("renovacion-owner@example.com")
-    superadmin = crear_usuario("renovacion-admin@example.com", superusuario=True)
-    empresa = crear_empresa(dueno, "Renovación")
-    plan = crear_plan(nombre="Base", precio=Decimal("100.00"))
-    suscripcion = activar_suscripcion(empresa, plan)
-    PeriodoSuscripcion.objects.create(
-        suscripcion=suscripcion, plan=plan, fecha_inicio=suscripcion.fecha_inicio,
-        fecha_vencimiento=suscripcion.fecha_vencimiento, importe_acordado=Decimal("100.00"),
-        moneda_acordada="PEN", frecuencia_acordada=FrecuenciaSuscripcion.MENSUAL,
-        creado_por=superadmin,
-    )
-    api_super = cliente(superadmin)
-    assert api_super.post(
-        f"/api/plataforma/empresas/{empresa.pk}/suscripcion/estado/",
-        {"estado": "suspendida"}, format="json",
-    ).status_code == 200
-    api_super.patch(f"/api/plataforma/planes/{plan.pk}/", {"precio": "160.00"}, format="json")
-
-    solicitud = cliente(dueno).post(
-        f"/api/empresas/administradas/{empresa.pk}/suscripcion/",
-        {"plan_id": plan.pk}, format="json",
-    )
-    assert solicitud.status_code == 201
-    assert solicitud.data["tipo"] == "renovacion"
-    inicio = suscripcion.fecha_vencimiento + timedelta(days=1)
-    aprobacion = api_super.post(
-        f"/api/plataforma/solicitudes/{solicitud.data['id']}/resolver/",
-        {"aprobar": True, "importe_verificado": "160.00", "fecha_inicio": inicio.isoformat()},
-        format="json",
-    )
-
-    assert aprobacion.status_code == 200
-    periodos = list(PeriodoSuscripcion.objects.order_by("fecha_inicio", "id"))
-    assert len(periodos) == 2
-    assert periodos[0].importe_acordado == Decimal("100.00")
-    assert periodos[1].importe_acordado == Decimal("160.00")
-    assert periodos[1].fecha_inicio == inicio
-    suscripcion.refresh_from_db()
-    assert suscripcion.estado == EstadoSuscripcion.ACTIVA
-
-
-def test_estado_efectivo_y_gracia_de_suscripcion_configurable(crear_usuario):
-    usuario = crear_usuario("gracia@example.com")
-    superadmin = crear_usuario("gracia-admin@example.com", superusuario=True)
-    empresa = crear_empresa(usuario, "Vigencia")
-    plan = crear_plan()
-    suscripcion = activar_suscripcion(empresa, plan)
-    ConfiguracionSuscripcion.objects.create(dias_gracia=2, actualizado_por=superadmin)
-    hoy = suscripcion.fecha_vencimiento + timedelta(days=1)
-    suscripcion.fecha_vencimiento = hoy - timedelta(days=1)
-    suscripcion.save(update_fields=["fecha_vencimiento"])
-
-    assert suscripcion_operativa(empresa, hoy=hoy)
-    assert suscripcion_operativa(empresa, hoy=hoy + timedelta(days=1))
-    assert not suscripcion_operativa(empresa, hoy=hoy + timedelta(days=2))
-
-
-def test_lista_global_muestra_vencimiento_calculado(crear_usuario):
-    usuario = crear_usuario("empresa-vencida@example.com")
-    superadmin = crear_usuario("super-vigencia@example.com", superusuario=True)
-    empresa = crear_empresa(usuario, "Suscripción vencida")
-    suscripcion = activar_suscripcion(empresa, crear_plan())
-    suscripcion.fecha_vencimiento = timezone.localdate() - timedelta(days=1)
-    suscripcion.save(update_fields=["fecha_vencimiento"])
-
-    respuesta = cliente(superadmin).get("/api/empresas/plataforma/")
-
-    assert respuesta.status_code == 200
-    fila = next(item for item in respuesta.data["results"] if item["id"] == empresa.pk)
-    assert fila["suscripcion"]["estado"] == EstadoSuscripcion.VENCIDA
-

@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { cuenta } from '../services/cuenta'
+import { useEmpresasStore } from '@/modules/empresas/stores/empresas'
 
 export function puedeAcceder(usuario, rol) {
   if (!usuario) return false
@@ -19,14 +20,24 @@ export const useAutenticacionStore = defineStore('autenticacion', () => {
   const autenticado = computed(() => usuario.value !== null)
   let consulta = null
 
+  function limpiarSesion() {
+    usuario.value = null
+    useEmpresasStore().limpiar()
+  }
+
+  function establecerUsuario(datos) {
+    if (usuario.value && usuario.value.id !== datos.id) useEmpresasStore().limpiar()
+    usuario.value = datos
+  }
+
   async function recuperarSesion() {
     if (consulta) return consulta
     consulta = cuenta.perfil().then(({ data }) => {
-      usuario.value = data
+      establecerUsuario(data)
       return data
     }).catch((error) => {
       if (error.response?.status === 401) {
-        usuario.value = null
+        limpiarSesion()
         return null
       }
       throw error
@@ -35,23 +46,27 @@ export const useAutenticacionStore = defineStore('autenticacion', () => {
   }
 
   async function ingresar(datos) {
-    usuario.value = (await cuenta.ingresar(datos)).data
+    const { data } = await cuenta.ingresar(datos)
+    useEmpresasStore().limpiar()
+    usuario.value = data
   }
 
   async function registrar(datos) {
-    usuario.value = (await cuenta.registrar(datos)).data
+    const { data } = await cuenta.registrar(datos)
+    useEmpresasStore().limpiar()
+    usuario.value = data
   }
 
   async function actualizar(datos) {
-    usuario.value = (await cuenta.actualizar(datos)).data
+    establecerUsuario((await cuenta.actualizar(datos)).data)
   }
 
   async function salir() {
     try { await cuenta.salir() } catch (error) {
       if (error.response?.status !== 401) throw error
     }
-    usuario.value = null
+    limpiarSesion()
   }
 
-  return { usuario, autenticado, recuperarSesion, ingresar, registrar, actualizar, salir }
+  return { usuario, autenticado, recuperarSesion, ingresar, registrar, actualizar, salir, limpiarSesion }
 })

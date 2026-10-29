@@ -7,6 +7,7 @@ import { normalizarIntervalos, validarIntervalos, validarIntervalosDentroDeMarco
 import SemanaEditor from './SemanaEditor.vue'
 import ExcepcionesPanel from './ExcepcionesPanel.vue'
 import DisponibilidadOperativa from './DisponibilidadOperativa.vue'
+import SelectControl from '@/shared/components/controles/SelectControl.vue'
 
 const props = defineProps({
   sedes: { type: Array, default: () => [] },
@@ -114,7 +115,7 @@ async function cargarHorarioCancha() {
     horarioCancha.value = []
   } finally { if (actual === solicitudCancha) cargandoCancha.value = false }
 }
-async function seleccionarCancha() { error.value = ''; mensaje.value = ''; await cargarHorarioCancha() }
+async function seleccionarCancha(id) { canchaId.value = String(id); error.value = ''; mensaje.value = ''; await cargarHorarioCancha() }
 async function guardarHorarioSede() {
   error.value = ''
   mensaje.value = ''
@@ -169,7 +170,7 @@ function actualizarCancha(intervalos) { horarioCancha.value = intervalos }
   <section class="space-y-5" aria-labelledby="gestion-horarios-titulo">
     <div class="flex flex-wrap items-start justify-between gap-4">
       <div><h2 id="gestion-horarios-titulo" class="text-xl font-bold">Horarios y cierres</h2><p class="mt-1 text-sm text-app-text-muted">Organiza los días y horas operativas de cada sede y cancha.</p></div>
-      <label v-if="!sedeFija && listaSedes.length" class="min-w-56 flex-1 sm:max-w-xs"><span class="admin-label">Sede</span><select v-model="sedeId" class="admin-field" aria-label="Seleccionar sede" @change="cargarSede"><option v-for="sede in listaSedes" :key="sede.id" :value="String(sede.id)">{{ sede.nombre }}</option></select></label>
+      <SelectControl v-if="!sedeFija && listaSedes.length" id="horarios-sede" wrapper-class="min-w-56 flex-1 sm:max-w-xs" :model-value="sedeId" label="Sede" :options="listaSedes.map((sede) => ({ value: String(sede.id), label: sede.nombre }))" @update:model-value="seleccionarSede" />
       <p v-else-if="sedeSeleccionada" class="rounded-lg border border-app-border bg-app-surface-2 px-3 py-2 text-sm font-semibold">{{ sedeSeleccionada.nombre }}</p>
     </div>
     <p v-if="error" class="admin-error" role="alert">{{ error }}</p>
@@ -190,7 +191,7 @@ function actualizarCancha(intervalos) { horarioCancha.value = intervalos }
         <article class="admin-card space-y-4">
           <div class="flex flex-wrap items-end justify-between gap-3">
             <div><h3 class="text-lg font-bold">Horario por cancha</h3><p class="mt-1 text-sm text-app-text-muted">El carril lima muestra el horario propio dentro del marco de la sede.</p></div>
-            <label v-if="canchas.length" class="min-w-56 flex-1 sm:max-w-xs"><span class="admin-label">Cancha</span><select v-model="canchaId" class="admin-field" aria-label="Seleccionar cancha" @change="seleccionarCancha"><option v-for="cancha in canchas" :key="cancha.id" :value="String(cancha.id)">{{ cancha.nombre }}</option></select></label>
+            <SelectControl v-if="canchas.length" id="horarios-cancha" wrapper-class="min-w-56 flex-1 sm:max-w-xs" :model-value="canchaId" label="Cancha" :options="canchas.map((cancha) => ({ value: String(cancha.id), label: cancha.nombre }))" @update:model-value="seleccionarCancha" />
           </div>
           <p v-if="!canchas.length" class="rounded-xl bg-app-surface-2 p-4 text-sm text-app-text-muted">Esta sede todavía no tiene canchas para configurar.</p>
           <template v-else>

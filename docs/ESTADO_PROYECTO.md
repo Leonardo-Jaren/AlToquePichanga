@@ -1,8 +1,8 @@
 # Estado del Proyecto — AlToque Pichanga
 
-Actualizado: 18 de octubre de 2026 (America/Lima).
-Fase 2: **completada**. Fases 3A — gestión de canchas y 3B — horarios, cierres y disponibilidad base: **implementadas**. La verificación final de Fase 3B está registrada en PLAN_PRUEBAS.md.
-Siguiente fase: **Fase 3C — tarifas y cálculo de precios** (pendiente de autorización).
+Actualizado: 25 de octubre de 2026 (America/Lima).
+Fases 2, 3A, 3B, 3C, 3D, 4A, 4B y 4C: **implementadas**. Los resultados de verificación están registrados en PLAN_PRUEBAS.md.
+Siguiente fase: **Fase 4D — confirmación final, notificación y ticket QR**.
 
 ## Base conservada
 
@@ -130,8 +130,9 @@ La migración aditiva de Fase 3A está en
 `apps/canchas/migrations/0001_initial.py`. La comprobación de migraciones no detectó
 cambios faltantes. Fase 3B añade `apps/horarios/migrations/0001_initial.py`.
 
-`showmigrations` confirmó las migraciones de Fase 2, 3A y 3B aplicadas en la base local
-de desarrollo. Se comprobó que contiene solo el fixture marcado de Fase 3B; no se
+`showmigrations` confirmó las migraciones de Fase 2, 3A, 3B, `tarifas.0001_initial` y
+`canchas.0002_cancha_publicada` aplicadas en la base local de desarrollo. Se comprobó que
+contiene solo el fixture marcado de demostración; no se
 reinició ni se eliminó ninguna base de datos. Pytest crea y migra una base temporal aparte.
 
 ## Validación local registrada — Fase 2
@@ -158,11 +159,115 @@ un servicio externo no se hizo para Google OAuth ni para SMTP.
 2. Servicio SMTP y entrega a una bandeja real.
 3. Ejecución remota de GitHub Actions.
 4. Confirmación de las propuestas comerciales de DECISIONES.md, en particular la
-   semántica de límites nulos, gracia, duración de invitaciones y periodos suspendidos.
-5. Siguiente entrega: Fase 3C — tarifas y cálculo de precios, pendiente de autorización.
+   semántica de límites nulos, gracia, duración de invitaciones, periodos suspendidos y propuestas de prioridad de tarifas.
+5. Fase 4B — disponibilidad en tiempo real con Django Channels/Redis.
 
 ## Continuidad
 
 Leer AGENTS.md, AUTENTICACION.md, ARQUITECTURA.md, MODELO_DATOS.md,
 DECISIONES.md y PLAN_PRUEBAS.md antes de continuar.
 
+
+## Fase 3C: tarifas y cálculo de precios — implementada
+
+- `apps.tarifas.ReglaTarifa` configura precios Decimal/PEN por cancha, tipo, días o fechas,
+  horario y vigencia; desactivar una regla conserva su historial y cada cambio se audita.
+- API para listar, crear, editar y activar/desactivar reglas con validación de empresa y
+  sede. El cajero consulta; el superadministrador tiene acceso global auditado.
+- El cálculo reutilizable comprueba bloques operativos, cierres y tarifas faltantes, y
+  devuelve importes por bloque, subtotal, total y moneda. Se mantiene
+  `considera_reservas: false`.
+- El panel permite administrar reglas y consultar precios por cancha; las cuentas locales
+  de prueba incluyen 22 tarifas demostrativas en dos empresas.
+- Las prioridades comerciales y la zona horaria configurable por sede siguen pendientes
+  de aprobación en DECISIONES.md.
+
+## Fase 3D: calendario, integración y validación — implementada
+
+- Calendario operativo diario/semanal en los paneles de dueño, administrador de sede,
+  cajero (solo consulta) y superadministrador. Consume bloques del endpoint integrado con
+  horarios, cierres, estado de cancha y tarifas; distingue ampliaciones excepcionales.
+- Selección de hasta 24 bloques consecutivos y cotización preliminar a través del servicio
+  Decimal del backend. No reserva ni bloquea; `considera_reservas: false` permanece explícito.
+- `Cancha.publicada` incorpora publicación voluntaria y desactivada por defecto. Los
+  endpoints públicos muestran únicamente los campos aprobados, precios/bloques permitidos y
+  no exponen contactos o información empresarial privada.
+- Se conserva `America/Lima` como zona técnica actual; zona por sede, prioridad de reglas,
+  horarios diurno/nocturno y demás propuestas siguen pendientes de decisión comercial.
+- La migración aditiva `canchas.0002_cancha_publicada` agrega el control de publicación.
+  Los datos locales de demostración publican una cancha de cada empresa y preservan las seis
+  cuentas existentes.
+- Resultados exactos de suites y validaciones al cierre de esta fase: `docs/PLAN_PRUEBAS.md`.
+  Al cierre de Fase 3D, las reservas, retenciones, pagos y WebSockets seguían fuera de
+  alcance; las retenciones se implementaron después en Fase 4A.
+
+## Fase 4A — motor de reservas y retención temporal
+
+Implementa la reserva real sobre horarios, excepciones y tarifas existentes. Una solicitud
+autenticada de jugador genera una retención por 1–24 bloques consecutivos, importe y adelanto
+calculados con Decimal, snapshot de precio, código único e historial. /mis-reservas permite
+consultar o cancelar una retención propia.
+
+PostgreSQL evita solapamientos con transacción atómica, bloqueo de la cancha, bloques
+horarios y una restricción de exclusión GiST para los intervalos no liberados. Los reintentos
+por clave UUID son idempotentes. La disponibilidad pública y administrativa ahora considera
+retenciones y mantiene el aislamiento por empresa/sede; la consulta operativa de 3B conserva
+considera_reservas: false.
+
+El plazo técnico inicial configurable es de 15 minutos y sigue PENDIENTE de aprobación
+comercial. El comando expirar_retenciones actualiza estados y libera bloques aunque no haya
+usuarios conectados; el despliegue debe programarlo en el servidor. No se implementaron pagos,
+WebSockets, WhatsApp, confirmación ni QR.
+
+El frontend reutiliza el calendario matricial basado en Stitch y los controles compartidos de
+tabla, modal y botón, adaptados a la paleta y tipografías oficiales de AlToque. El generador
+local conserva las seis cuentas y sus contraseñas existentes, agrega tres reservas demo y
+migra la guía local anterior sin revelar ni reemplazar credenciales.
+
+Resultados completos de backend, frontend y verificaciones estáticas: ver la sección Fase 4A
+de docs/PLAN_PRUEBAS.md.
+
+## Fase 4B — disponibilidad en tiempo real
+
+Channels/ASGI enruta `ws/disponibilidad/` con sesiones existentes, validación de origen y
+autorización por cancha, publicación, empresa y sede. Los grupos filtran por cancha/fecha y
+los payloads mínimos solo contienen tipo, cancha, fecha y motivo. Los cambios de retención,
+horario, excepción, tarifa, cancha y sede se publican después del commit; PostgreSQL continúa
+siendo la fuente oficial.
+
+Los calendarios público y administrativo usan un composable compartido, reconexión progresiva
+limitada, reconsulta REST, indicador accesible y actualización manual. Una selección que deja
+de estar disponible se invalida con aviso visible. Se añadió una segunda cuenta jugador al
+seeder idempotente para probar dos sesiones independientes sin reemplazar claves locales.
+Playwright ya está configurado para Chromium y automatiza retención + cancelación entre dos
+contextos de navegador.
+
+Desarrollo local permite InMemory con un solo proceso; producción requiere Redis configurado
+por `REDIS_URL` o `REDIS_HOST`/`REDIS_PORT`. La prueba que requiere servidor Redis real se
+omite cuando el servicio no está disponible en el entorno. El proceso de vencimientos puede
+ejecutarse continuamente con `python manage.py expirar_retenciones --continuo --intervalo 60`;
+la retención configurable de 15 minutos sigue pendiente de aprobación comercial.
+
+Resultados completos de pytest, Vitest, Playwright, Django check, Ruff, migraciones y build:
+ver la sección Fase 4B de `docs/PLAN_PRUEBAS.md`. No se implementaron pagos, comprobantes,
+confirmación de reserva, WhatsApp, correo de reserva ni QR.
+
+## Fase 4C — pagos Yape/Plin y verificación manual
+
+Implementa métodos de pago separados por sede (Yape, Plin y transferencia), solicitud de
+adelanto mínimo/total/saldo a partir del precio histórico, enlace WhatsApp prellenado y
+declaración manual del comprobante. El equipo autorizado revisa el importe y referencia desde
+la cola de pagos; las aprobaciones y rechazos quedan auditados. No se automatiza la aprobación
+por abrir WhatsApp o declarar el envío.
+
+El jugador consulta `/mis-reservas/<código>/pago`. Dueño o administrador de sede configura los
+medios en **Pagos**; cajero revisa la cola en `/panel/cajero` → **Pagos**. La aprobación deja
+la reserva en `pendiente_confirmacion`; QR, correo y confirmación final quedan para 4D.
+`RESERVA_REVISION_PAGO_MINUTOS=15` es provisional y configurable. Pagos están deshabilitados
+por defecto en producción hasta aprobar las decisiones comerciales registradas en
+`docs/DECISIONES.md`.
+
+El generador local conserva las cuentas y sus contraseñas estables, y añade 12 medios y pagos
+ficticios identificados. Las cuentas, referencias y números de demo no se deben usar para
+pagos reales. Ver escenarios reproducibles en `docs/USUARIOS_PRUEBA.md` y resultados exactos
+de las suites en `docs/PLAN_PRUEBAS.md`.

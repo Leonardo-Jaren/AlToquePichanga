@@ -62,6 +62,9 @@ function subirImagen() {
       </div>
       <EstadoEtiqueta :estado="cancha.estado" />
     </div>
+    <p class="w-fit rounded-full border border-app-border px-3 py-1 text-xs font-semibold" :class="cancha.publicada ? 'bg-[var(--status-success-bg)] text-[var(--status-success-text)]' : 'bg-app-surface-2 text-app-text-muted'">
+      {{ cancha.publicada ? 'Visible en consulta pública' : 'Solo visible en administración' }}
+    </p>
 
     <figure v-if="cancha.imagen_principal_url" class="overflow-hidden rounded-xl border border-app-border bg-app-surface-2">
       <img :src="cancha.imagen_principal_url" :alt="`Imagen principal de ${cancha.nombre}`" class="h-44 w-full object-cover" loading="lazy">

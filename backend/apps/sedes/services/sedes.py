@@ -11,6 +11,7 @@ from apps.empresas.models import (
 from apps.empresas.repositories.alcance import sede_administrable, sedes_visibles
 from apps.empresas.repositories.empresas import empresas_propietario
 from apps.empresas.services.auditoria import auditar
+from apps.reservas.services.eventos import programar_cambio_sede
 from apps.sedes.models import ImagenSede, Sede
 from apps.sedes.serializers import datos_imagen, datos_sede
 from apps.suscripciones.services.reglas import empresa_con_cupo, suscripcion_operativa
@@ -100,6 +101,8 @@ def cambiar_estado_sede(usuario: User, identificador: int, activa: bool) -> dict
     sede = get_object_or_404(Sede.objects.select_for_update(), pk=identificador)
     if not _puede_escribir(usuario, sede):
         raise PermissionDenied("No tienes acceso para cambiar esta sede.")
+    if sede.activa == activa:
+        return datos_sede(sede)
     if activa and not usuario.is_superuser:
         empresa_con_cupo(sede.empresa_id, "sede")
     sede.activa = activa
@@ -108,6 +111,7 @@ def cambiar_estado_sede(usuario: User, identificador: int, activa: bool) -> dict
         usuario, "activar" if activa else "desactivar",
         "sede", sede.pk, sede.empresa,
     )
+    programar_cambio_sede(sede.pk, "sede_actualizada")
     return datos_sede(sede)
 
 

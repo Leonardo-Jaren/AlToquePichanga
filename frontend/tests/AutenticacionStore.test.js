@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { cuenta } from '@/modules/autenticacion/services/cuenta'
 import { destinoUsuario, puedeAcceder, useAutenticacionStore } from '@/modules/autenticacion/stores/autenticacion'
+import { useEmpresasStore } from '@/modules/empresas/stores/empresas'
 
 vi.mock('@/modules/autenticacion/services/cuenta', () => ({
   cuenta: { perfil: vi.fn(), ingresar: vi.fn(), registrar: vi.fn(), salir: vi.fn(), actualizar: vi.fn() },
@@ -27,8 +28,14 @@ describe('Sesión de servidor', () => {
     await Promise.all([auth.recuperarSesion(), auth.recuperarSesion()])
     expect(cuenta.perfil).toHaveBeenCalledTimes(1)
     cuenta.perfil.mockRejectedValue({ response: { status: 401 } })
+    const empresas = useEmpresasStore()
+    empresas.lista = [{ id: 8, nombre: 'Empresa anterior' }]
+    empresas.seleccionar(8)
     expect(await auth.recuperarSesion()).toBeNull()
     expect(auth.autenticado).toBe(false)
+    expect(empresas.lista).toEqual([])
+    expect(empresas.activaId).toBeNull()
+    expect(localStorage.getItem('altoque.empresa-activa')).toBeNull()
   })
   it('propaga fallo de red sin afirmar que la sesión se cerró', async () => {
     cuenta.ingresar.mockResolvedValue({ data: jugador })
@@ -48,6 +55,22 @@ describe('Sesión de servidor', () => {
     expect(auth.usuario.nombre).toBe('Nuevo')
     await auth.salir()
     expect(auth.usuario).toBeNull()
+    expect(useEmpresasStore().lista).toEqual([])
+    expect(localStorage.getItem('altoque.empresa-activa')).toBeNull()
+  })
+  it('reemplaza el usuario activo cuando se inicia sesión con otra cuenta', async () => {
+    const otro = { ...jugador, id: 2, correo: 'dos@example.com', nombre: 'Dos' }
+    cuenta.ingresar.mockResolvedValueOnce({ data: jugador }).mockResolvedValueOnce({ data: otro })
+    const auth = useAutenticacionStore()
+    const empresas = useEmpresasStore()
+    await auth.ingresar({ correo: jugador.correo })
+    empresas.lista = [{ id: 7, nombre: 'Empresa del primer usuario' }]
+    empresas.seleccionar(7)
+    await auth.ingresar({ correo: otro.correo })
+    expect(auth.usuario).toEqual(otro)
+    expect(auth.autenticado).toBe(true)
+    expect(empresas.lista).toEqual([])
+    expect(localStorage.getItem('altoque.empresa-activa')).toBeNull()
   })
   it.each(['dueno', 'administrador_sede', 'cajero'])('resuelve el rol %s sin perder el rol jugador', (rol) => {
     const usuario = { ...jugador, membresias: [{ empresa_id: 1, rol }] }

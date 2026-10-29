@@ -8,6 +8,7 @@ from apps.canchas.views import (
     RetirarImagenCanchaView,
 )
 from apps.horarios.views import DisponibilidadOperativaView, HorarioCanchaView
+from apps.tarifas.urls import urlpatterns as rutas_tarifas
 
 urlpatterns = [
     path("", CanchasView.as_view(), name="canchas"),
@@ -22,3 +23,5 @@ urlpatterns = [
         name="retirar-imagen-cancha",
     ),
 ]
+
+urlpatterns += rutas_tarifas

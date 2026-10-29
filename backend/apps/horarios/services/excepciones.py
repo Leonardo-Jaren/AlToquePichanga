@@ -18,6 +18,7 @@ from apps.horarios.models import (
 )
 from apps.horarios.repositories.excepciones import excepciones_visibles
 from apps.horarios.services.horarios import _datos_intervalo
+from apps.reservas.services.eventos import programar_cambio_sede_intervalo
 from apps.sedes.models import Sede
 from apps.sedes.services.sedes import _exigir_suscripcion
 
@@ -179,6 +180,10 @@ def crear_excepcion(usuario: User, datos: dict) -> dict:
         "sede_id": sede.pk, "cancha_id": cancha.pk if cancha else None,
         "tipo": excepcion.tipo, "motivo": excepcion.motivo,
     })
+    programar_cambio_sede_intervalo(
+        sede.pk, excepcion.fecha_inicio, excepcion.fecha_fin,
+        "excepcion_actualizada", cancha.pk if cancha else None,
+    )
     return datos_excepcion(excepcion)
 
 
@@ -202,4 +207,8 @@ def anular_excepcion(usuario: User, excepcion_id: int) -> dict:
         "sede_id": excepcion.sede_id, "cancha_id": excepcion.cancha_id,
         "tipo": excepcion.tipo,
     })
+    programar_cambio_sede_intervalo(
+        sede.pk, excepcion.fecha_inicio, excepcion.fecha_fin,
+        "excepcion_actualizada", excepcion.cancha_id,
+    )
     return datos_excepcion(excepcion)

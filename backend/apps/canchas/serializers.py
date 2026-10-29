@@ -17,6 +17,7 @@ class CanchaEntrada(EntradaEstricta):
     )
     techada = serializers.BooleanField(required=False)
     iluminacion = serializers.BooleanField(required=False)
+    publicada = serializers.BooleanField(required=False)
     caracteristicas = serializers.ListField(
         child=serializers.CharField(max_length=100, allow_blank=False),
         max_length=30,
@@ -107,6 +108,7 @@ def datos_cancha(cancha: Cancha) -> dict[str, object]:
         "iluminacion": cancha.iluminacion,
         "caracteristicas": cancha.caracteristicas,
         "estado": cancha.estado,
+        "publicada": cancha.publicada,
         "imagen_principal_url": cancha.imagen_principal.url if cancha.imagen_principal else None,
         "imagenes": [datos_imagen(imagen, cancha) for imagen in imagenes],
         "creada_en": cancha.creada_en.isoformat(),

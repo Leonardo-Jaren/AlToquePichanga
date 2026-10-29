@@ -107,6 +107,7 @@ async function guardar() {
       capacidad_jugadores: capacidad,
       techada: form.techada,
       iluminacion: form.iluminacion,
+      publicada: form.publicada,
       caracteristicas: form.caracteristicas.split('\n').map((item) => item.trim()).filter(Boolean),
     },
     imagenPrincipal: imagenPrincipal.value,
@@ -119,7 +120,7 @@ async function guardar() {
     <div class="mb-5 flex items-start justify-between gap-3">
       <div>
         <h3 id="formulario-cancha-titulo" class="text-lg font-bold">{{ cancha ? 'Editar cancha' : 'Nueva cancha' }}</h3>
-        <p class="mt-1 text-sm text-app-text-muted">Registra sus características operativas. La disponibilidad horaria se configurará en otra fase.</p>
+        <p class="mt-1 text-sm text-app-text-muted">Registra las características y decide si la cancha aparecerá en la consulta pública de horarios.</p>
       </div>
       <button class="admin-button admin-button-quiet shrink-0" type="button" aria-label="Cerrar formulario" :disabled="guardando" @click="emit('cancelar')">
         <X aria-hidden="true" class="size-4" /><span class="hidden sm:inline">Cerrar</span>
@@ -186,6 +187,10 @@ async function guardar() {
         <span class="admin-label">Otras características</span>
         <textarea id="cancha-caracteristicas" v-model="form.caracteristicas" class="admin-field min-h-20" rows="3" maxlength="3030" placeholder="Una característica por línea: tribuna, vestuarios…" :aria-invalid="Boolean(errorCampo('caracteristicas'))" :aria-describedby="errorCampo('caracteristicas') ? 'error-caracteristicas' : undefined" />
         <span v-if="errorCampo('caracteristicas')" id="error-caracteristicas" class="mt-1 block text-sm text-[var(--status-danger-text)]">{{ errorCampo('caracteristicas') }}</span>
+      </label>
+      <label class="flex min-h-14 items-start gap-3 rounded-xl border border-app-border bg-app-surface-2 p-3 md:col-span-2">
+        <input v-model="form.publicada" type="checkbox" class="mt-1 size-4 accent-[var(--brand-lime)]">
+        <span><span class="block font-semibold">Publicar horarios y precios</span><span class="mt-0.5 block text-sm text-app-text-muted">Mostraremos nombre, características, fotos, sede y disponibilidad operativa. No se publican contactos ni datos de administración.</span></span>
       </label>
       <label class="md:col-span-2">
         <span class="admin-label">Imagen principal <span class="font-normal text-app-text-muted">(PNG, JPG o WebP, máximo 5 MB)</span></span>

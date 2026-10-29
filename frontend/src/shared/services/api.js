@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { EVENTO_SESION_EXPIRADA } from './eventosSesion'
 
 /**
  * Cliente HTTP unificado para la API de AlToque Pichanga.
@@ -11,6 +12,14 @@ const api = axios.create({
     'Content-Type': 'application/json',
     Accept: 'application/json',
   },
+})
+
+api.interceptors.response.use((respuesta) => respuesta, (error) => {
+  const url = String(error.config?.url || '')
+  if (error.response?.status === 401 && !url.includes('/auth/') && typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(EVENTO_SESION_EXPIRADA))
+  }
+  return Promise.reject(error)
 })
 
 // El token CSRF se obtiene en memoria, también después de que Django lo rote al ingresar.

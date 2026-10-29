@@ -31,6 +31,7 @@ export const canchasApi = {
     `${rutaCanchas}${canchaId}/imagenes/${imagenId}/retirar/`, { confirmar: true },
   ),
   listarSedes: () => api.get('/sedes/'),
+  listarPublicas: () => api.get('/publico/canchas/'),
 }
 
 export function datosCanchaParaFormulario(cancha = {}) {
@@ -49,6 +50,7 @@ export function datosCanchaParaFormulario(cancha = {}) {
     capacidad_jugadores: cancha.capacidad_jugadores ?? '',
     techada: Boolean(cancha.techada),
     iluminacion: Boolean(cancha.iluminacion),
+    publicada: Boolean(cancha.publicada),
     caracteristicas,
   }
 }

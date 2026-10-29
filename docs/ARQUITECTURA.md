@@ -11,11 +11,12 @@
 
 ## 2. Stack instalado
 
-Backend: Python 3.12, Django 6.1.2, DRF, PostgreSQL 17, pytest-django y Ruff.
+Backend: Python 3.12, Django 6.1.2, DRF, PostgreSQL 17, pytest-django, Ruff,
+Channels/ASGI y Redis para comunicación en tiempo real.
 Frontend: Vue 3 Composition API, Vite, JavaScript, Tailwind, Pinia, Vue Router,
-Axios, Lucide y Vitest. Channels/ASGI y Redis quedan disponibles para fases posteriores.
+Axios, Lucide, Vitest y Playwright para la E2E de dos sesiones.
 
-## 3. Módulos implementados hasta Fase 3B
+## 3. Módulos implementados hasta Fase 4B
 
 Backend:
 
@@ -181,3 +182,170 @@ El máximo de canchas se aplica al total de la empresa. Qué estados consumen cu
 siendo un supuesto pendiente de aprobación, aunque el contrato actual usa `activa` y
 `mantenimiento` como estados que consumen y `inactiva` como estado que libera.
 
+
+## 11. Módulo de tarifas — Fase 3C
+
+`apps/tarifas` separa modelos, repositorio, serializadores, validación, gestión, cálculo e
+integración de disponibilidad. `ReglaTarifa` pertenece a una cancha y guarda tipo, ámbito
+semanal o fechas aplicables, horario, vigencia, importe Decimal, moneda, activación y
+responsable. Desactivar conserva el historial.
+
+- GET/POST `/api/canchas/{cancha_id}/tarifas/`: consulta y crea reglas dentro del alcance
+  autorizado de la persona autenticada.
+- PATCH `/api/canchas/{cancha_id}/tarifas/{tarifa_id}/`: actualiza una regla de esa cancha.
+- POST `/api/canchas/{cancha_id}/tarifas/{tarifa_id}/estado/`: activa o desactiva con
+  confirmación explícita y valida conflictos al activar.
+- POST `/api/canchas/{cancha_id}/calcular-precio/`: calcula de 1 a 24 bloques de una hora,
+  comprobando primero el horario operativo.
+- GET de disponibilidad 3B incorpora `precio`, `tipo_tarifa`, `moneda` y `tarifa_estado`
+  para bloques habilitados; los cerrados nunca muestran precio y se conserva
+  `considera_reservas: false`.
+
+El cálculo y las reglas viven en servicios. El frontend tiene paneles bajo
+`modules/tarifas/components/`, divididos en formularios, listados, paneles y precios, y el
+control reutilizable `shared/components/controles/SelectControl.vue`.
+
+## 12. Calendario integrado — Fase 3D
+
+`modules/calendario/` reúne el selector de sede/cancha, el calendario diario/semanal, la
+vista pública y los controles de bloques en subcarpetas `components/`, `views/` y `utils/`.
+Los paneles de dueño, administrador de sede, cajero y superadministrador reutilizan el mismo
+calendario. La API de disponibilidad 3B y el cálculo tarifario 3C siguen siendo la fuente
+única para estados, precios y cotizaciones; el navegador no suma importes ni reserva bloques.
+
+`Cancha.publicada` es un permiso de publicación explícito, apagado por defecto. El dueño,
+administrador de sede o superadministrador puede cambiarlo mediante el PATCH administrativo
+existente para la cancha; cajeros solo consultan. Endpoints públicos, deliberadamente
+`AllowAny` y limitados a canchas publicadas en sedes/empresas activas:
+
+La base `VistaPublica` desactiva autenticación de sesión en estas rutas porque entregan datos
+publicables o una cotización calculada sin persistencia; así, una cookie de sesión preexistente
+no fuerza un token CSRF en una consulta pública. El panel administrativo conserva su
+autenticación y validación CSRF.
+
+- GET `/api/publico/canchas/` y GET `/api/publico/canchas/{cancha_id}/`: únicamente datos
+  definidos como públicos (cancha, fotos activas y distrito/provincia/departamento de sede).
+- GET `/api/publico/canchas/{cancha_id}/disponibilidad/?desde=&hasta=`: reutiliza los bloques
+  operativos y las reglas tarifarias; considera retenciones con `considera_reservas: true`, omite precios en
+  intervalos cerrados y reemplaza motivos internos de cierres por mensajes genéricos.
+- POST `/api/publico/canchas/{cancha_id}/cotizar/`: usa el mismo servicio de cálculo
+  Decimal/PEN del panel autenticado. Solo devuelve una estimación y no persiste ni bloquea.
+
+La página Vue está disponible en `/canchas-publicas`. Ninguna ruta pública expone dirección,
+contactos, empleados, membresías, suscripciones o datos de gestión. La autorización
+administrativa sigue resolviéndose en Django por identidad y sede; `empresa_id` del navegador
+no concede acceso.
+
+## 13. Motor de reservas y retenciones — Fase 4A
+
+apps.reservas mantiene modelos, serializadores, vistas, servicios de disponibilidad y estados,
+y el comando expirar_retenciones. La empresa y la sede se resuelven mediante la relación
+Reserva → Cancha → Sede → Empresa; no se duplican esos identificadores en la reserva.
+El servicio reutiliza horarios, cierres y tarifas existentes, vuelve a cotizar en el servidor
+y guarda una copia histórica del importe por bloque.
+
+Endpoints:
+
+- POST /api/reservas/: requiere sesión y crea una retención idempotente de 1 a 24 bloques.
+- GET /api/reservas/mias/, GET /api/reservas/{codigo}/ y POST
+  /api/reservas/{codigo}/cancelar/: solo el jugador propietario puede consultar o cancelar
+  una retención vigente.
+- GET /api/reservas/administracion/ y GET
+  /api/reservas/administracion/{codigo}/: paginación y filtros dentro de las canchas que
+  canchas_visibles(usuario) autoriza; el cajero es de lectura y el superadministrador se
+  audita.
+- GET /api/reservas/administracion/disponibilidad/{cancha_id}/?desde=&hasta=: consulta para
+  paneles con alcance administrativo.
+- GET /api/publico/canchas/{cancha_id}/disponibilidad/?desde=&hasta=: incorpora retenciones
+  activas y devuelve considera_reservas: true, estado_reserva y reservable sin datos personales.
+  La disponibilidad operativa autenticada de 3B sigue indicando false.
+- POST /api/publico/canchas/{cancha_id}/cotizar/ sigue siendo de solo lectura y responde
+  conflicto si el intervalo ya se retuvo.
+
+Solo están habilitadas las transiciones inicial → retenida, retenida → vencida y
+retenida → cancelada. Las opciones para pagos, rechazo, confirmación y finalización están
+modeladas, pero no se aceptan por la API en esta fase. Cada cambio guarda motivo y responsable
+cuando aplica.
+
+Para impedir choques, crear_retencion usa transaction.atomic() y bloquea la fila de Cancha;
+luego persiste una fila por hora. PostgreSQL mantiene la garantía final con btree_gist y una
+restricción de exclusión sobre cancha + tstzrange(inicio, fin, '[)') para bloques no liberados.
+Los límites adyacentes son válidos; cualquier solapamiento parcial se rechaza. Una clave única
+por jugador vuelve idempotentes los reintentos. Cancelación y vencimiento liberan bloques sin
+borrarlos.
+
+RESERVA_RETENCION_MINUTOS acepta un entero positivo y tiene un valor técnico provisional de
+15 minutos; la duración comercial está pendiente. El comando python manage.py
+expirar_retenciones debe programarse en el servidor (propuesta operativa: cada minuto) para
+vencer solicitudes incluso sin jugadores conectados. Leer disponibilidad ignora retenciones
+expiradas aunque la tarea todavía no haya actualizado su estado.
+
+El frontend público integra modules/reservas/: solicitud, código, contador informativo y
+/mis-reservas. El panel administrativo reusa la matriz de horarios de Stitch, con resumen,
+estados, detalle y filtros adaptados a los tokens aprobados de AlToque; TablaBase.vue,
+ModalBase.vue y BotonBase.vue son controles comunes reutilizables. Fase 4A no incorpora pagos,
+WhatsApp, correos de reserva ni QR.
+
+## 14. Disponibilidad en tiempo real — Fase 4B
+
+ASGI enruta `ws/disponibilidad/` mediante Django Channels, `AuthMiddlewareStack` y
+`OriginValidator` contra `CORS_ALLOWED_ORIGINS`. El socket usa la cookie de sesión existente;
+no acepta tokens ni credenciales en la URL. Los parámetros `canchas`, `desde` y `hasta` solo
+identifican lo solicitado: el consumer vuelve a comprobar publicación, sesión, membresía y
+alcance por sede en el servidor. Se permiten hasta 24 canchas y siete fechas por conexión.
+Usuarios anónimos solo pueden suscribirse a canchas publicadas. Un superadministrador que
+consulta una cancha privada genera un registro `AccesoPlataforma`.
+
+Cada socket se une a grupos por cancha/fecha y a un grupo general de esa cancha para cambios
+semanales, de tarifa o de estado. Retenciones nuevas, canceladas y vencidas notifican las
+fechas locales afectadas. Cambios de horarios, excepciones, tarifas, cancha o sede también
+emiten avisos. El payload solo incluye `tipo`, `cancha_id`, `fecha` y `motivo`; el consumidor
+rechaza mensajes enviados por el cliente y revalida sesión y alcance antes de cada aviso.
+Todos los productores usan `transaction.on_commit()`; una reversión no anuncia cambios.
+
+En desarrollo puede usarse `InMemoryChannelLayer` con `DEBUG=True` y un solo proceso ASGI.
+En producción se debe configurar `USE_REDIS_CHANNEL_LAYER=True` y `REDIS_URL` en el entorno;
+la configuración falla al arrancar con `DEBUG=False` sin Redis. No guardar la URL con
+credenciales en Git. La URL se puede dejar vacía para usar `REDIS_HOST`/`REDIS_PORT`.
+
+Ejecutar `python manage.py expirar_retenciones --continuo --intervalo 60` en un proceso
+supervisado, tanto en desarrollo como en producción. Este reutiliza el servicio atómico de 4A,
+libera bloques en PostgreSQL y emite avisos al confirmar. Mantener también el comando de una
+sola ejecución `python manage.py expirar_retenciones` para operación manual. La duración
+`RESERVA_RETENCION_MINUTOS=15` permanece configurable y pendiente de aprobación comercial.
+
+El frontend mantiene una conexión por calendario, reintenta con backoff limitado, hace una
+consulta REST al reconectar y permite actualización manual cuando el socket falla. La API REST
+sigue siendo la fuente de disponibilidad y PostgreSQL conserva la protección contra choques.
+
+## 15. Pagos manuales de reservas — Fase 4C
+
+`apps.pagos` mantiene los modelos `MetodoPagoSede`, `PagoReserva` y `HistorialPagoReserva`.
+El método pertenece a una sede; el pago se relaciona con la reserva y el método de esa misma
+sede, de modo que empresa y sede se resuelven desde la reserva autorizada en el servidor.
+Este flujo no reutiliza `PagoSuscripcion`, no procesa dinero del SaaS y no integra pasarelas.
+
+El jugador consulta `/api/pagos/reservas/<codigo>/`, crea una solicitud de adelanto, total o
+saldo, y declara que envió el comprobante. El backend calcula el importe desde la cotización
+histórica de la reserva, usa `Decimal`, limita a una solicitud pendiente por reserva e impide
+que la declaración apruebe el pago. `wa.me` solo lleva el texto prellenado; el jugador agrega
+manualmente la captura.
+
+Dueños y administradores de sede pueden mantener los medios autorizados de sus sedes. Cajeros
+leen los medios activos y pueden revisar pagos solo dentro de sus asignaciones. El jugador ve
+únicamente sus propias reservas y medios activos destinados al pago. Las consultas globales
+del superadministrador quedan auditadas y la configuración de cuentas no se delega al rol
+global. Repositorios y servicios validan el alcance; la API no confía en `empresa_id` o
+`sede_id` del navegador.
+
+La revisión manual se implementa en `/api/pagos/administracion/`: lista filtrada, detalle,
+aprobación y rechazo con motivo e historial de actor/fecha. Rechazar o aprobar requiere una
+transición permitida, alcance de sede, transacción y bloqueo; la aprobación no emite correo,
+QR ni finaliza la reserva. Esta última transición se reserva para la Fase 4D.
+
+`RESERVA_REVISION_PAGO_MINUTOS` define el límite provisional de revisión y el jugador solo
+puede extender la retención una vez al declarar el comprobante. Un pago aprobado que alcance
+su vencimiento sin completar la fase posterior conserva el registro contable, libera el
+bloque y requiere conciliación manual. La duración y la habilitación en producción están
+pendientes de aprobación comercial; `PAGOS_RESERVA_HABILITADOS` queda desactivado por defecto
+cuando `DEBUG=False`.

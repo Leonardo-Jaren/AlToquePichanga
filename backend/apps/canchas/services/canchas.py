@@ -10,6 +10,7 @@ from apps.canchas.serializers import datos_cancha
 from apps.empresas.models import AccesoPlataforma, RegistroAuditoria
 from apps.empresas.repositories.alcance import sede_administrable, sedes_visibles
 from apps.empresas.services.auditoria import auditar
+from apps.reservas.services.eventos import programar_cambio_disponibilidad
 from apps.sedes.services.sedes import _exigir_suscripcion
 from apps.suscripciones.services.reglas import empresa_con_cupo
 
@@ -66,7 +67,7 @@ def actualizar_cancha(usuario: User, cancha_id: int, datos: dict) -> dict:
         _exigir_suscripcion(cancha.sede.empresa)
     campos = (
         "nombre", "descripcion", "modalidad", "tipo_superficie", "capacidad_jugadores",
-        "techada", "iluminacion", "caracteristicas", "imagen_principal",
+        "techada", "iluminacion", "caracteristicas", "publicada", "imagen_principal",
     )
     cambios = {campo: datos[campo] for campo in campos if campo in datos}
     for campo, valor in cambios.items():
@@ -75,6 +76,8 @@ def actualizar_cancha(usuario: User, cancha_id: int, datos: dict) -> dict:
     auditar(usuario, "actualizar", "cancha", cancha.pk, cancha.sede.empresa, {
         "campos": sorted(cambios),
     })
+    if cambios:
+        programar_cambio_disponibilidad(cancha.pk, None, "cancha_actualizada")
     return datos_cancha(cancha)
 
 
@@ -93,6 +96,7 @@ def cambiar_estado_cancha(usuario: User, cancha_id: int, estado: str) -> dict:
     auditar(usuario, "cambiar_estado", "cancha", cancha.pk, cancha.sede.empresa, {
         "anterior": anterior, "nuevo": estado,
     })
+    programar_cambio_disponibilidad(cancha.pk, None, "cancha_actualizada")
     return datos_cancha(cancha)
 
 

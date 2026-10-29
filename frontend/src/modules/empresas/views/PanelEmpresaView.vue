@@ -10,6 +10,11 @@ import EquipoPanel from '../components/EquipoPanel.vue'
 import SuscripcionPanel from '../components/SuscripcionPanel.vue'
 import GestionCanchasPanel from '@/modules/canchas/components/GestionCanchasPanel.vue'
 import GestionHorariosPanel from '@/modules/horarios/components/GestionHorariosPanel.vue'
+import GestionTarifasPanel from '@/modules/tarifas/components/paneles/GestionTarifasPanel.vue'
+import CalendarioAdminPanel from '@/modules/calendario/components/paneles/CalendarioAdminPanel.vue'
+import ReservasAdminPanel from '@/modules/reservas/components/ReservasAdminPanel.vue'
+import PagosAdminPanel from '@/modules/pagos/components/PagosAdminPanel.vue'
+import SelectControl from '@/shared/components/controles/SelectControl.vue'
 
 const store = useEmpresasStore()
 const seccion = ref('resumen')
@@ -28,6 +33,10 @@ const menu = [
   { id: 'sedes', nombre: 'Sedes' },
   { id: 'canchas', nombre: 'Canchas' },
   { id: 'horarios', nombre: 'Horarios' },
+  { id: 'tarifas', nombre: 'Tarifas' },
+  { id: 'calendario', nombre: 'Calendario' },
+  { id: 'reservas', nombre: 'Reservas' },
+  { id: 'pagos', nombre: 'Pagos' },
   { id: 'equipo', nombre: 'Equipo' },
   { id: 'suscripcion', nombre: 'Suscripción' },
 ]
@@ -38,6 +47,10 @@ const titulo = computed(() => ({
   sedes: 'Sedes de tu empresa',
   canchas: 'Canchas de tu empresa',
   horarios: 'Horarios y cierres',
+  tarifas: 'Tarifas por cancha',
+  calendario: 'Calendario operativo',
+  reservas: 'Solicitudes de reserva',
+  pagos: 'Pagos de reserva',
   equipo: 'Personas y accesos',
   suscripcion: 'Plan de plataforma',
 }[seccion.value]))
@@ -47,6 +60,10 @@ const descripcion = computed(() => ({
   sedes: 'Organiza la información independiente de cada complejo.',
   canchas: 'Administra las instalaciones de todas las sedes de tu empresa.',
   horarios: 'Configura horarios semanales, cierres y cambios para tus sedes y canchas.',
+  tarifas: 'Define precios por cancha, horario y fechas especiales.',
+  calendario: 'Consulta horarios operativos, cierres y precios de tus canchas.',
+  reservas: 'Consulta retenciones de todas las sedes de la empresa.',
+  pagos: 'Configura cuentas de pago y revisa comprobantes de tus sedes.',
   equipo: 'Asigna roles y autoriza únicamente las sedes necesarias.',
   suscripcion: 'Consulta los periodos registrados y solicita activación o renovación.',
 }[seccion.value]))
@@ -87,7 +104,8 @@ async function cargarSedes() {
 }
 function cambiarSeccion(valor) {
   seccion.value = valor
-  if (valor === 'equipo' || valor === 'canchas' || valor === 'horarios') cargarSedes()
+  if (valor !== 'resumen') mostrandoAlta.value = false
+  if (valor === 'equipo' || valor === 'canchas' || valor === 'horarios' || valor === 'tarifas' || valor === 'calendario') cargarSedes()
 }
 async function crearEmpresa() {
   altaError.value = ''
@@ -111,12 +129,9 @@ function actualizarEmpresa(datos) {
 <template>
   <AdminLayout :titulo="titulo" :descripcion="descripcion" :secciones="menu" :activa="seccion" @cambiar-seccion="cambiarSeccion">
     <template #sidebar>
-      <label v-if="store.lista.length" class="mt-5 block">
-        <span class="admin-label">Empresa activa</span>
-        <select class="admin-field" :value="store.activaId" @change="store.seleccionar($event.target.value)">
-          <option v-for="item in store.lista" :key="item.id" :value="item.id">{{ item.nombre_comercial || item.razon_social || item.nombre }}</option>
-        </select>
-      </label>
+      <div v-if="store.lista.length" class="mt-5">
+        <SelectControl id="empresa-activa" label="Empresa activa" :model-value="String(store.activaId || '')" :options="store.lista.map((item) => ({ value: String(item.id), label: item.nombre_comercial || item.razon_social || item.nombre }))" @update:model-value="store.seleccionar" />
+      </div>
     </template>
 
     <p v-if="error" role="alert" class="admin-error mb-4">{{ error }}</p>
@@ -138,13 +153,13 @@ function actualizarEmpresa(datos) {
     </template>
 
     <template v-else>
-      <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+      <div v-if="seccion === 'resumen'" class="mb-5 flex flex-wrap items-center justify-between gap-3">
         <p class="font-semibold">{{ empresa.nombre_comercial || empresa.razon_social || empresa.nombre }}</p>
         <button class="admin-button admin-button-secondary" @click="mostrandoAlta = !mostrandoAlta">
           {{ mostrandoAlta ? 'Cancelar' : 'Registrar otra empresa' }}
         </button>
       </div>
-      <form v-if="mostrandoAlta" class="admin-card mb-5 grid gap-4 sm:grid-cols-2" @submit.prevent="crearEmpresa">
+      <form v-if="seccion === 'resumen' && mostrandoAlta" class="admin-card mb-5 grid gap-4 sm:grid-cols-2" @submit.prevent="crearEmpresa">
         <label><span class="admin-label">Razón social *</span><input v-model.trim="razon" class="admin-field" required maxlength="180"></label>
         <label><span class="admin-label">Nombre comercial</span><input v-model.trim="nombre" class="admin-field" maxlength="160"></label>
         <label><span class="admin-label">RUC (opcional)</span><input v-model.trim="ruc" class="admin-field" inputmode="numeric" maxlength="11"></label>
@@ -185,8 +200,12 @@ function actualizarEmpresa(datos) {
       <SedesPanel v-else-if="seccion === 'sedes'" :key="empresa.id" :empresa="empresa" :suscripcion="resumenSuscripcion?.suscripcion" />
       <GestionCanchasPanel v-else-if="seccion === 'canchas'" :key="'canchas-' + empresa.id" :sedes="sedesEmpresa" />
       <GestionHorariosPanel v-else-if="seccion === 'horarios'" :key="'horarios-' + empresa.id" :sedes="sedesEmpresa" />
+      <GestionTarifasPanel v-else-if="seccion === 'tarifas'" :key="'tarifas-' + empresa.id" :sedes="sedesEmpresa" />
+      <CalendarioAdminPanel v-else-if="seccion === 'calendario'" :key="'calendario-' + empresa.id" :sedes="sedesEmpresa" />
+      <ReservasAdminPanel v-else-if="seccion === 'reservas'" :key="'reservas-' + empresa.id" :empresa-id="empresa.id" />
+      <PagosAdminPanel v-else-if="seccion === 'pagos'" :key="'pagos-' + empresa.id" :sedes="sedesEmpresa" :configurar-medios="true" />
       <EquipoPanel v-else-if="seccion === 'equipo'" :key="'equipo-' + empresa.id" :empresa="empresa" :sedes="sedesEmpresa" :suscripcion="resumenSuscripcion?.suscripcion" />
-      <SuscripcionPanel v-else :key="'plan-' + empresa.id" :empresa="empresa" />
+      <SuscripcionPanel v-else-if="seccion === 'suscripcion'" :key="'plan-' + empresa.id" :empresa="empresa" />
     </template>
   </AdminLayout>
 </template>

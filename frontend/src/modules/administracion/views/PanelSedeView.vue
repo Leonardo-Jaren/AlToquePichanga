@@ -6,6 +6,10 @@ import { empresasApi } from '@/modules/empresas/services/empresas'
 import api from '@/shared/services/api'
 import GestionCanchasPanel from '@/modules/canchas/components/GestionCanchasPanel.vue'
 import GestionHorariosPanel from '@/modules/horarios/components/GestionHorariosPanel.vue'
+import GestionTarifasPanel from '@/modules/tarifas/components/paneles/GestionTarifasPanel.vue'
+import CalendarioAdminPanel from '@/modules/calendario/components/paneles/CalendarioAdminPanel.vue'
+import ReservasAdminPanel from '@/modules/reservas/components/ReservasAdminPanel.vue'
+import PagosAdminPanel from '@/modules/pagos/components/PagosAdminPanel.vue'
 
 const sedes = ref([])
 const seleccionada = ref(null)
@@ -18,7 +22,35 @@ const form = reactive({})
 const portada = ref(null)
 const imagenGaleria = ref(null)
 const vista = ref('sede')
-const titulo = computed(() => editando.value ? 'Editar sede asignada' : 'Tus sedes asignadas')
+const menu = [
+  { id: 'sede', nombre: 'Información de sede' },
+  { id: 'canchas', nombre: 'Canchas' },
+  { id: 'horarios', nombre: 'Horarios' },
+  { id: 'tarifas', nombre: 'Tarifas' },
+  { id: 'calendario', nombre: 'Calendario' },
+  { id: 'reservas', nombre: 'Reservas' },
+  { id: 'pagos', nombre: 'Pagos' },
+]
+const titulos = {
+  sede: 'Información de sede',
+  canchas: 'Canchas de sede',
+  horarios: 'Horarios y cierres',
+  tarifas: 'Tarifas por cancha',
+  calendario: 'Calendario operativo',
+  reservas: 'Solicitudes de reserva',
+  pagos: 'Pagos de reserva',
+}
+const descripciones = {
+  sede: 'Actualiza la información de una sede dentro del alcance que te asignaron.',
+  canchas: 'Consulta y administra las canchas de esta sede.',
+  horarios: 'Configura horarios semanales, cierres y excepciones.',
+  tarifas: 'Define precios por cancha, horario y fechas especiales.',
+  calendario: 'Consulta los horarios operativos, cierres y precios de las canchas autorizadas.',
+  reservas: 'Consulta las retenciones de esta sede autorizada.',
+  pagos: 'Revisa comprobantes de la sede y consulta el historial de verificación.',
+}
+const titulo = computed(() => editando.value ? 'Editar sede asignada' : titulos[vista.value])
+const descripcion = computed(() => descripciones[vista.value])
 
 onMounted(cargar)
 async function cargar() {
@@ -112,7 +144,8 @@ async function cambiarEstado() {
 </script>
 
 <template>
-  <AdminLayout :titulo="titulo" descripcion="La información y las acciones están limitadas a las sedes asignadas a tu cuenta.">
+  <AdminLayout :titulo="titulo" :descripcion="descripcion"
+    :secciones="menu" :activa="vista" @cambiar-seccion="vista = $event">
     <p v-if="error" role="alert" class="admin-error mb-4">{{ error }}</p>
     <p v-if="mensaje" role="status" class="admin-success mb-4">{{ mensaje }}</p>
     <p v-if="cargando" role="status" class="admin-card">Cargando sedes…</p>
@@ -131,13 +164,12 @@ async function cambiarEstado() {
         </button>
       </nav>
       <section v-if="seleccionada" class="min-w-0">
-        <nav class="mb-4 flex flex-wrap gap-2" aria-label="Administración de sede">
-          <button class="admin-button" :class="vista === 'sede' ? 'admin-button-primary' : 'admin-button-secondary'" type="button" :aria-pressed="vista === 'sede'" @click="vista = 'sede'">Información de sede</button>
-          <button class="admin-button" :class="vista === 'canchas' ? 'admin-button-primary' : 'admin-button-secondary'" type="button" :aria-pressed="vista === 'canchas'" @click="vista = 'canchas'">Canchas</button>
-          <button class="admin-button" :class="vista === 'horarios' ? 'admin-button-primary' : 'admin-button-secondary'" type="button" :aria-pressed="vista === 'horarios'" @click="vista = 'horarios'">Horarios</button>
-        </nav>
         <GestionCanchasPanel v-if="vista === 'canchas'" :key="'canchas-sede-' + seleccionada.id" :sedes="sedes" :sede-inicial-id="seleccionada.id" :sede-fija="true" />
         <GestionHorariosPanel v-else-if="vista === 'horarios'" :key="'horarios-sede-' + seleccionada.id" :sedes="sedes" :sede-inicial-id="seleccionada.id" :sede-fija="true" />
+        <GestionTarifasPanel v-else-if="vista === 'tarifas'" :key="'tarifas-sede-' + seleccionada.id" :sedes="sedes" :sede-inicial-id="seleccionada.id" :sede-fija="true" />
+        <CalendarioAdminPanel v-else-if="vista === 'calendario'" :key="'calendario-sede-' + seleccionada.id" :sedes="sedes" :sede-inicial-id="seleccionada.id" :sede-fija="true" />
+        <ReservasAdminPanel v-else-if="vista === 'reservas'" :key="'reservas-sede-' + seleccionada.id" :sede-id="seleccionada.id" />
+        <PagosAdminPanel v-else-if="vista === 'pagos'" :key="'pagos-sede-' + seleccionada.id" :sedes="[seleccionada]" :sede-inicial-id="seleccionada.id" :sede-fija="true" :configurar-medios="true" />
         <section v-else class="admin-card">
         <div class="flex flex-wrap items-start justify-between gap-3">
           <div><p class="text-sm text-app-text-muted">{{ seleccionada.empresa }}</p><h2 class="mt-1 text-xl font-bold">{{ seleccionada.nombre }}</h2><p class="mt-1 text-sm text-app-text-muted">{{ seleccionada.direccion }}</p></div>

@@ -116,6 +116,8 @@ function normalizarErrores(fallo) {
 }
 
 async function guardarCancha({ datos, imagenPrincipal }) {
+  if (datos.publicada && !canchaEditando.value?.publicada
+    && !window.confirm('La cancha y sus horarios y precios visibles se mostrarán en la consulta pública. ¿Quieres publicarla?')) return
   guardando.value = true
   error.value = ''
   mensaje.value = ''

@@ -25,6 +25,10 @@ class Cancha(models.Model):
     estado = models.CharField(
         max_length=16, choices=EstadoCancha.choices, default=EstadoCancha.ACTIVA
     )
+    publicada = models.BooleanField(
+        default=False,
+        help_text="Permite consultar públicamente solo los datos aprobados de la cancha.",
+    )
     imagen_principal = models.FileField(
         upload_to="canchas/principales/", blank=True
     )

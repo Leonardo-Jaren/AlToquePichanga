@@ -35,6 +35,7 @@ CORREOS = {
     "admin_a": "demo-admin-sede-a@example.test",
     "cajero_a": "demo-cajero-a@example.test",
     "jugador": "demo-jugador@example.test",
+    "jugador_b": "demo-jugador-b@example.test",
 }
 
 USUARIOS = {
@@ -44,6 +45,7 @@ USUARIOS = {
     "admin_a": ("demo_altoque_admin_sede_a", "Administrador de sede A", False),
     "cajero_a": ("demo_altoque_cajero_a", "Cajero de sede A", False),
     "jugador": ("demo_altoque_jugador", "Jugador sin membresía", False),
+    "jugador_b": ("demo_altoque_jugador_b", "Jugador B sin membresía", False),
 }
 
 EMPRESAS = {
@@ -141,7 +143,8 @@ def _obtener_usuarios(credenciales: dict) -> dict[str, User]:
         usuario.is_active = True
         usuario.is_superuser = es_superusuario
         usuario.is_staff = es_superusuario
-        usuario.set_password(password)
+        if not usuario.check_password(password):
+            usuario.set_password(password)
         usuario.save()
 
         perfiles = list(PerfilUsuario.objects.filter(correo__iexact=correo)[:2])
@@ -246,6 +249,7 @@ def _obtener_sedes(empresas: dict) -> dict[str, Sede]:
                 "departamento": "Huánuco",
                 "provincia": "Huánuco",
                 "distrito": "Huánuco",
+                "whatsapp_contacto": "00000000000",
                 "activa": True,
             },
         )
@@ -272,6 +276,7 @@ def _obtener_canchas(sedes: dict) -> dict[str, Cancha]:
                 "capacidad_jugadores": 14,
                 "techada": False,
                 "iluminacion": True,
+                "publicada": clave in {"cancha_a_heredada", "cancha_b_centro_1"},
                 "caracteristicas": ["Datos de prueba"],
                 "estado": "activa",
             },
@@ -315,6 +320,7 @@ def _validar_membresias_esperadas(usuarios: dict, empresas: dict) -> None:
         "admin_a": (empresas["empresa_a"], RolEmpresa.ADMINISTRADOR_SEDE),
         "cajero_a": (empresas["empresa_a"], RolEmpresa.CAJERO),
         "jugador": None,
+        "jugador_b": None,
     }
     for clave, esperado in esperadas.items():
         membresias = MembresiaEmpresa.objects.filter(usuario=usuarios[clave])
@@ -336,8 +342,14 @@ def crear_datos_demo(credenciales: dict) -> None:
     sedes = _obtener_sedes(empresas)
     canchas = _obtener_canchas(sedes)
     from apps.usuarios.services.datos_demo_horarios import crear_horarios_demo
+    from apps.usuarios.services.datos_demo_pagos import crear_pagos_demo
+    from apps.usuarios.services.datos_demo_reservas import crear_reservas_demo
+    from apps.usuarios.services.datos_demo_tarifas import crear_tarifas_demo
 
     crear_horarios_demo(sedes, canchas, usuarios)
+    crear_tarifas_demo(canchas, usuarios)
+    reservas = crear_reservas_demo(canchas, usuarios)
+    crear_pagos_demo(sedes, reservas, usuarios)
     _validar_membresias_esperadas(usuarios, empresas)
 
     _obtener_membresia(usuarios["dueno_a"], empresas["empresa_a"], RolEmpresa.DUENO)

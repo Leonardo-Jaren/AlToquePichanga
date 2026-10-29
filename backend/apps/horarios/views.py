@@ -11,7 +11,6 @@ from apps.horarios.serializers import (
     HorarioCanchaEntrada,
     HorarioSedeEntrada,
 )
-from apps.horarios.services.disponibilidad import consultar_disponibilidad_operativa
 from apps.horarios.services.excepciones import (
     anular_excepcion,
     crear_excepcion,
@@ -23,6 +22,7 @@ from apps.horarios.services.horarios import (
     guardar_horario_cancha,
     guardar_horario_sede,
 )
+from apps.tarifas.services.disponibilidad import consultar_disponibilidad_tarifada
 
 
 class HorarioSedeView(APIView):
@@ -79,7 +79,7 @@ class DisponibilidadOperativaView(APIView):
     def get(self, request: Request, cancha_id: int) -> Response:
         filtros = DisponibilidadEntrada(data=request.query_params)
         filtros.is_valid(raise_exception=True)
-        return Response(consultar_disponibilidad_operativa(
+        return Response(consultar_disponibilidad_tarifada(
             request.user, cancha_id, filtros.validated_data["desde"],
             filtros.validated_data["hasta"],
         ))

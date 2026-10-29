@@ -15,7 +15,10 @@ from apps.horarios.models import (
     IntervaloHorarioSede,
     TipoExcepcionHorario,
 )
+from apps.pagos.models import EstadoPagoReserva, MetodoPagoSede, PagoReserva
+from apps.reservas.models import EstadoReserva, Reserva
 from apps.sedes.models import Sede
+from apps.tarifas.models import ReglaTarifa, TipoTarifa
 from apps.usuarios.management.commands import generar_datos_demo as comando
 from apps.usuarios.services.datos_demo import CORREOS, MARCA
 
@@ -112,15 +115,94 @@ def test_creacion_idempotente_y_password_local_estable(monkeypatch, tmp_path):
     credenciales_segunda = _leer_archivo(ruta)
 
     assert credenciales_segunda == credenciales_primera
-    assert User.objects.count() == 6
+    assert "Comprobaciones manuales de Fase 4B" in ruta.read_text(encoding="utf-8")
+    assert User.objects.count() == 7
     assert Empresa.objects.filter(descripcion__startswith=MARCA).count() == 2
     assert Sede.objects.filter(descripcion__startswith=MARCA).count() == 4
     assert Cancha.objects.filter(descripcion__startswith=MARCA).count() == 6
+    assert set(Cancha.objects.filter(publicada=True).values_list("nombre", flat=True)) == {
+        f"{MARCA} Cancha A heredada", f"{MARCA} Cancha B Centro 1",
+    }
+    assert ReglaTarifa.objects.count() == 22
+    assert ReglaTarifa.objects.filter(tipo=TipoTarifa.DIURNA).count() == 6
+    assert ReglaTarifa.objects.filter(tipo=TipoTarifa.NOCTURNA).count() == 6
+    assert ReglaTarifa.objects.filter(tipo=TipoTarifa.FIN_SEMANA).count() == 6
+    assert ReglaTarifa.objects.filter(tipo=TipoTarifa.FERIADO).count() == 2
+    assert ReglaTarifa.objects.filter(tipo=TipoTarifa.ESPECIAL).count() == 2
+    reservas = list(Reserva.objects.select_related("cancha__sede").order_by("cancha__sede__empresa_id", "inicio"))
+    assert len(reservas) == 3
+    assert {reserva.estado for reserva in reservas} == {
+        EstadoReserva.PENDIENTE_VERIFICACION,
+        EstadoReserva.PENDIENTE_PAGO,
+        EstadoReserva.VENCIDA,
+    }
+    assert len({reserva.cancha.sede.empresa_id for reserva in reservas}) == 2
+    vencida = next(reserva for reserva in reservas if reserva.estado == EstadoReserva.VENCIDA)
+    assert vencida.bloques.filter(liberado_en__isnull=True).count() == 0
+    assert vencida.historial_estados.count() == 2
+    assert MetodoPagoSede.objects.count() == 12
+    assert set(PagoReserva.objects.values_list("estado", flat=True)) == {
+        EstadoPagoReserva.RECHAZADO,
+        EstadoPagoReserva.APROBADO,
+        EstadoPagoReserva.PENDIENTE_REVISION,
+        EstadoPagoReserva.PENDIENTE_PAGO,
+        EstadoPagoReserva.PAGO_TARDIO,
+    }
+    assert PagoReserva.objects.filter(requiere_conciliacion=True).exists()
     for clave, correo in CORREOS.items():
         usuario = User.objects.get(email=correo)
         assert usuario.is_active
         assert usuario.check_password(credenciales_primera["usuarios"][clave]["contrasena"])
-        assert usuario.password != hashes_primera[correo]  # Django renueva el salt; no la clave.
+        assert usuario.password == hashes_primera[correo]
+
+
+def test_actualiza_guia_local_antigua_sin_cambiar_contrasenas(monkeypatch, tmp_path):
+    credenciales = _generar(monkeypatch, tmp_path)
+    ruta = _preparar_comando(monkeypatch, tmp_path)
+    hash_original = dict(User.objects.values_list("email", "password"))
+    ruta.write_text(
+        comando._renderizar_bloque_credenciales(credenciales)
+        + comando._GUIA_LOCAL_ANTERIOR_FASE3D,
+        encoding="utf-8",
+    )
+
+    call_command("generar_datos_demo", stdout=StringIO(), stderr=StringIO())
+
+    assert "Comprobaciones manuales de Fase 4B" in ruta.read_text(encoding="utf-8")
+    assert _leer_archivo(ruta) == credenciales
+    assert dict(User.objects.values_list("email", "password")) == hash_original
+
+
+def test_migra_guia_de_seis_roles_sin_cambiar_contrasenas_existentes(monkeypatch, tmp_path):
+    credenciales = _generar(monkeypatch, tmp_path)
+    ruta = _preparar_comando(monkeypatch, tmp_path)
+    hash_original = dict(User.objects.values_list("email", "password"))
+    version_anterior = {
+        **credenciales,
+        "usuarios": {
+            rol: datos for rol, datos in credenciales["usuarios"].items()
+            if rol != "jugador_b"
+        },
+    }
+    ruta.write_text(
+        comando._renderizar_bloque_credenciales(version_anterior)
+        + comando._GUIA_LOCAL_ANTERIOR_FASE4A,
+        encoding="utf-8",
+    )
+
+    call_command("generar_datos_demo", stdout=StringIO(), stderr=StringIO())
+
+    actualizado = _leer_archivo(ruta)
+    assert set(actualizado["usuarios"]) == set(CORREOS)
+    for rol in set(CORREOS) - {"jugador_b"}:
+        assert actualizado["usuarios"][rol] == credenciales["usuarios"][rol]
+    assert actualizado["usuarios"]["jugador_b"]["correo"] == CORREOS["jugador_b"]
+    assert User.objects.get(email=CORREOS["jugador_b"]).check_password(
+        actualizado["usuarios"]["jugador_b"]["contrasena"]
+    )
+    for correo, hash_guardado in hash_original.items():
+        if correo != CORREOS["jugador_b"]:
+            assert User.objects.get(email=correo).password == hash_guardado
 
 
 def test_fixture_de_horarios_incluye_herencia_horario_propio_y_excepciones(
@@ -149,6 +231,25 @@ def test_fixture_de_horarios_incluye_herencia_horario_propio_y_excepciones(
         cancha=cancha_propia,
         motivo__contains="mantenimiento",
     ).exists()
+
+
+def test_fixture_de_tarifas_cubre_dos_empresas_y_bloques_operativos(monkeypatch, tmp_path):
+    credenciales = _generar(monkeypatch, tmp_path)
+    empresas = set(ReglaTarifa.objects.values_list("cancha__sede__empresa_id", flat=True))
+    assert len(empresas) == 2
+    cancha_a = Cancha.objects.get(nombre=f"{MARCA} Cancha A heredada")
+    cancha_b = Cancha.objects.get(nombre=f"{MARCA} Cancha B Centro 1")
+    assert ReglaTarifa.objects.filter(cancha=cancha_a, tipo=TipoTarifa.DIURNA).exists()
+    assert ReglaTarifa.objects.filter(cancha=cancha_a, tipo=TipoTarifa.NOCTURNA).exists()
+    assert ReglaTarifa.objects.filter(cancha=cancha_a, tipo=TipoTarifa.FIN_SEMANA).exists()
+    assert ReglaTarifa.objects.filter(cancha=cancha_a, tipo=TipoTarifa.FERIADO).exists()
+    assert ReglaTarifa.objects.filter(cancha=cancha_a, tipo=TipoTarifa.ESPECIAL).exists()
+
+    dueno_a, _, _ = _iniciar_sesion("dueno_a", credenciales)
+    cajero_a, _, _ = _iniciar_sesion("cajero_a", credenciales)
+    assert dueno_a.get(f"/api/canchas/{cancha_a.pk}/tarifas/").status_code == 200
+    assert cajero_a.get(f"/api/canchas/{cancha_a.pk}/tarifas/").status_code == 200
+    assert dueno_a.get(f"/api/canchas/{cancha_b.pk}/tarifas/").status_code == 404
 
 
 def _iniciar_sesion(clave: str, credenciales: dict) -> tuple[APIClient, dict, str]:

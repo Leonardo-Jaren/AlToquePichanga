@@ -18,6 +18,10 @@ from apps.horarios.services.reglas_semanales import (
     intervalos_contenidos,
     validar_intervalos,
 )
+from apps.reservas.services.eventos import (
+    programar_cambio_disponibilidad,
+    programar_cambio_sede,
+)
 from apps.sedes.models import Sede
 from apps.sedes.services.sedes import _exigir_suscripcion
 
@@ -138,6 +142,7 @@ def guardar_horario_sede(usuario: User, sede_id: int, intervalos: list[dict]) ->
     auditar(usuario, "actualizar", "horario_sede", horario.pk, sede.empresa, {
         "sede_id": sede.pk, "intervalos": len(normalizados),
     })
+    programar_cambio_sede(sede.pk, "horario_actualizado")
     return _dto_horario_sede(sede, horario)
 
 
@@ -245,6 +250,7 @@ def guardar_horario_cancha(
         "dias_heredados": [] if hereda else heredados,
         "intervalos": len(normalizados),
     })
+    programar_cambio_disponibilidad(cancha.pk, None, "horario_actualizado")
     horario.refresh_from_db()
     propios = [
         _datos_intervalo(item) for item in horario.intervalos.all()

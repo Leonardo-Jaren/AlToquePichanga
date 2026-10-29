@@ -112,19 +112,15 @@ def _estado_bloque(
     return "operativa", True, None
 
 
-def consultar_disponibilidad_operativa(
-    usuario: User, cancha_id: int, desde: date, hasta: date
-) -> dict:
-    cancha = get_object_or_404(
-        canchas_visibles(usuario).select_related("sede", "sede__empresa"), pk=cancha_id
-    )
+def construir_disponibilidad_operativa(cancha: Cancha, desde: date, hasta: date) -> dict:
+    """Construye bloques para una cancha que el llamador ya autorizó."""
     sede = cancha.sede
     inicio_rango = _localizar(desde, time.min)
     fin_rango = _localizar(hasta + timedelta(days=1), time.min)
     escaneo_inicio = inicio_rango - timedelta(days=1)
     excepciones = _excepciones(sede.pk, cancha.pk, escaneo_inicio, fin_rango)
     intervalos_sede, intervalos_propios = _horarios(cancha)
-    periodos: list[tuple[datetime, datetime]] = []
+    periodos_semanales: list[tuple[datetime, datetime]] = []
 
     cursor_fecha = desde - timedelta(days=1)
     while cursor_fecha <= hasta:
@@ -136,17 +132,20 @@ def consultar_disponibilidad_operativa(
             item for item in intervalos_propios
             if item["dia_semana"] == cursor_fecha.weekday()
         )
-        periodos.extend(_periodo_semanal(cursor_fecha, item) for item in intervalos_dia)
+        periodos_semanales.extend(
+            _periodo_semanal(cursor_fecha, item) for item in intervalos_dia
+        )
         cursor_fecha += timedelta(days=1)
 
-    periodos.extend(
+    periodos_ampliacion = [
         (item.fecha_inicio, item.fecha_fin)
         for item in excepciones
         if item.tipo == TipoExcepcionHorario.AMPLIACION
-    )
+    ]
+    periodos_semanales = _unir_periodos(periodos_semanales)
     periodos = _unir_periodos([
         (max(inicio_rango - timedelta(days=1), inicio), min(fin_rango, fin))
-        for inicio, fin in periodos
+        for inicio, fin in [*periodos_semanales, *periodos_ampliacion]
         if inicio < fin_rango and fin > inicio_rango - timedelta(days=1)
     ])
 
@@ -160,6 +159,14 @@ def consultar_disponibilidad_operativa(
                 estado, habilitada, motivo = _estado_bloque(
                     cancha, sede, cursor, excepciones, ahora
                 )
+                es_horario_regular = any(
+                    apertura_regular <= cursor and final <= cierre_regular
+                    for apertura_regular, cierre_regular in periodos_semanales
+                )
+                es_ampliacion = not es_horario_regular and any(
+                    apertura_extra <= cursor and final <= cierre_extra
+                    for apertura_extra, cierre_extra in periodos_ampliacion
+                )
                 bloques.append({
                     "fecha_inicio": cursor.isoformat(),
                     "fecha_fin": final.isoformat(),
@@ -167,6 +174,7 @@ def consultar_disponibilidad_operativa(
                     "habilitada_operativamente": habilitada,
                     "motivo": motivo,
                     "considera_reservas": False,
+                    "origen": "ampliacion_excepcional" if es_ampliacion else "horario_semanal",
                 })
             cursor = final
 
@@ -178,11 +186,26 @@ def consultar_disponibilidad_operativa(
         "considera_reservas": False,
         "bloques": bloques,
     }
+    return resultado
+
+
+def consultar_disponibilidad_operativa(
+    usuario: User, cancha_id: int, desde: date, hasta: date
+) -> dict:
+    cancha = get_object_or_404(
+        canchas_visibles(usuario).select_related("sede", "sede__empresa"), pk=cancha_id
+    )
+    resultado = construir_disponibilidad_operativa(cancha, desde, hasta)
     if usuario.is_superuser:
         RegistroAuditoria.objects.create(
-            actor=usuario, empresa=sede.empresa,
+            actor=usuario, empresa=cancha.sede.empresa,
             accion="consultar_disponibilidad_operativa",
             recurso="disponibilidad_operativa", recurso_id=cancha.pk,
             datos={"desde": desde.isoformat(), "hasta": hasta.isoformat()},
         )
     return resultado
+
+
+def consultar_disponibilidad_operativa_publica(cancha: Cancha, desde: date, hasta: date) -> dict:
+    """Consulta una cancha publicada ya resuelta por el servicio de publicación."""
+    return construir_disponibilidad_operativa(cancha, desde, hasta)

@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
+    "django.contrib.postgres",
     "django.contrib.staticfiles",
     # Paquetes de terceros
     "rest_framework",
@@ -50,6 +51,9 @@ INSTALLED_APPS = [
     "apps.suscripciones",
     "apps.canchas",
     "apps.horarios",
+    "apps.tarifas",
+    "apps.reservas",
+    "apps.pagos",
 ]
 
 # Middlewares
@@ -105,20 +109,27 @@ DATABASES = {
 }
 
 # Configuración de Channels / WebSockets
-USE_REDIS = os.getenv("USE_REDIS_CHANNEL_LAYER", "False").lower() in ("true", "1", "yes")
+USE_REDIS = os.getenv(
+    "USE_REDIS_CHANNEL_LAYER", "False" if DEBUG else "True"
+).lower() in ("true", "1", "yes")
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = os.getenv("REDIS_PORT", "6379")
+REDIS_URL = os.getenv("REDIS_URL", "").strip()
 
 if USE_REDIS:
     CHANNEL_LAYERS = {
         "default": {
             "BACKEND": "channels_redis.core.RedisChannelLayer",
             "CONFIG": {
-                "hosts": [(REDIS_HOST, int(REDIS_PORT))],
+                "hosts": [REDIS_URL] if REDIS_URL else [(REDIS_HOST, int(REDIS_PORT))],
             },
         },
     }
 else:
+    if not DEBUG:
+        raise ImproperlyConfigured(
+            "Configura Redis para Channels en producción con USE_REDIS_CHANNEL_LAYER=True."
+        )
     CHANNEL_LAYERS = {
         "default": {
             "BACKEND": "channels.layers.InMemoryChannelLayer",
@@ -213,3 +224,13 @@ GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "")
 MAX_DIAS_CONSULTA_DISPONIBILIDAD = int(
     os.getenv("MAX_DIAS_CONSULTA_DISPONIBILIDAD", "31")
 )
+# Valor provisional de desarrollo; la duración comercial de la retención está pendiente.
+RESERVA_RETENCION_MINUTOS = int(os.getenv("RESERVA_RETENCION_MINUTOS", "15"))
+if RESERVA_RETENCION_MINUTOS < 1:
+    raise ImproperlyConfigured("RESERVA_RETENCION_MINUTOS debe ser un entero positivo.")
+RESERVA_REVISION_PAGO_MINUTOS = int(os.getenv("RESERVA_REVISION_PAGO_MINUTOS", "15"))
+if RESERVA_REVISION_PAGO_MINUTOS < 1:
+    raise ImproperlyConfigured("RESERVA_REVISION_PAGO_MINUTOS debe ser un entero positivo.")
+PAGOS_RESERVA_HABILITADOS = os.getenv(
+    "PAGOS_RESERVA_HABILITADOS", "True" if DEBUG else "False"
+).lower() in ("true", "1", "yes")
