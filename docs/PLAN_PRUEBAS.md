@@ -307,7 +307,9 @@ entorno que lo proporcione. No se habilitó el procesamiento de pagos en producc
 decisiones comerciales pendientes, el plazo provisional y el alcance excluido de Fase 4D siguen
 documentados en `docs/DECISIONES.md`.
 
-## Fase 4D — validación parcial
+## Fase 4D — validación histórica del primer avance
+
+Estos resultados corresponden al cierre anterior y fueron ampliados por la continuación documentada más abajo.
 
 - Servicio interno de confirmación: 3 pruebas enfocadas aprobadas (pago insuficiente,
   retención vencida, alcance cruzado, bloques liberados e idempotencia).
@@ -356,3 +358,21 @@ se añadieron los avisos de solicitud/cancelación de retención y la auditoría
 18 pruebas enfocadas de correos, condiciones y reservas pasaron. La suite de cierre se ejecuta
 sobre los 154 casos actuales. La suite frontend más reciente aprobó 126 pruebas, y Playwright
 aprobó dos escenarios; ninguno cubre aún ingreso E2E con una reserva en curso.
+
+Las pruebas de servicio y API heredadas usan `force_authenticate` para aislar permisos. El
+recorrido Playwright inicia sesión real como jugador y cajero. Una prueba adicional de API
+inicia sesión normal como jugador, segundo jugador, cajero, administrador de sede, dueños de
+ambas empresas y superadministrador; verifica pago, confirmación, ticket, acceso cruzado y
+auditoría global. Queda pendiente el E2E de asistencia durante un horario en curso.
+
+### Cierre de esta ejecución
+
+- Pytest completo: 153 aprobadas y una omitida (integración Redis sin servidor configurado).
+  Una prueba adicional de sesiones reales, incorporada después de recopilar la suite, pasó
+  por separado: 154 pruebas backend distintas aprobadas en total.
+- Vitest: 126 aprobadas. Playwright: 2 aprobadas; sigue pendiente el E2E de asistencia.
+- Ruff, Django check, comprobación de migraciones y build: aprobados. La revisión visual
+  cubrió ticket, cancelación y validación de ingreso en vistas móviles y de escritorio,
+  claras y oscuras. No se comprobó la cámara con un dispositivo físico.
+- Redis real, SMTP real y revisión legal de condiciones siguen pendientes; pagos de
+  producción permanecen deshabilitados por defecto.

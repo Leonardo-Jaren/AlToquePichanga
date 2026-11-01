@@ -139,7 +139,9 @@ Google OAuth real, SMTP real y CI remoto son validaciones externas pendientes y 
 se contabilizan como capacidades comprobadas.
 
 
-## Fase 4D — trabajo en curso
+## Fase 4D — registro histórico del primer avance
+
+Este apartado describe el cierre anterior; la situación actual se indica en la recuperación 4D más abajo.
 
 Existe un servicio interno de confirmación aislado, todavía sin endpoint ni integración con
 pagos. No marcar la fase completa: faltan ticket/QR, asistencia, cancelaciones, notificaciones,

@@ -197,7 +197,9 @@ su autorización antes de implementarse.
     el QR, el correo de confirmación y la transición final pertenecen a Fase 4D. No se habilita
     cancelación pagada ni devolución automática en esta entrega.
 
-## Fase 4D — restricción de datos demo
+## Fase 4D — diagnóstico histórico de datos demo
+
+Este diagnóstico se resolvió en la continuación documentada en el apartado siguiente.
 
 La sección 12 de AGENTS.md impide que el generador cree reservas, pagos y movimientos de caja.
 El generador heredado de fases previas todavía crea reservas y pagos; corregirlo y adaptar
@@ -222,3 +224,9 @@ propios datos aislados. La afirmación anterior de prohibición absoluta era dem
   automáticas. Mantener pagos de producción deshabilitados mientras sigan pendientes.
 - Configurar y verificar SMTP y Redis reales. La cola SMTP puede reenviar si cae el proceso
   tras la entrega y antes de registrar el resultado; no se promete entrega exactamente una vez.
+
+En desarrollo se usa por defecto el backend de correo en memoria de Django; sus mensajes no
+se entregan externamente y se pierden al finalizar el proceso. Para pruebas reales de correo
+se requiere configurar SMTP por entorno y verificar la entrega con autorización apropiada.
+La cola persistente se procesa con `python manage.py enviar_correos`, que debe programarse;
+la entrega no se ha verificado en esta fase.

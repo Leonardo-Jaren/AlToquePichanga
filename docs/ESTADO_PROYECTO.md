@@ -272,7 +272,9 @@ ficticios identificados. Las cuentas, referencias y números de demo no se deben
 pagos reales. Ver escenarios reproducibles en `docs/USUARIOS_PRUEBA.md` y resultados exactos
 de las suites en `docs/PLAN_PRUEBAS.md`.
 
-## Fase 4D — avance parcial, no habilitada
+## Fase 4D — registro histórico del primer avance
+
+La descripción de este apartado refleja el cierre anterior y quedó superada por la continuación 4D documentada más abajo.
 
 Se añadió `confirmar_reserva_verificada` como preparación interna, sin endpoint ni conexión a
 la aprobación de pagos. Exige personal con alcance sobre la cancha, reserva en
@@ -336,3 +338,8 @@ estos avisos demuestra entrega SMTP real.
 La creación de una solicitud y la cancelación de una retención también agregan avisos a la
 cola. Las consultas globales de las condiciones de una sede se registran en auditoría. La
 validación de los dos últimos cambios pasó en una ejecución enfocada de 18 pruebas.
+
+Una prueba de integración adicional usa sesiones reales de jugador, cajero, administrador,
+dueños de ambas empresas y superadministrador para comprobar el flujo y sus límites de acceso.
+Las pruebas de servicios individuales mantienen autenticación forzada para aislar permisos;
+queda pendiente el E2E de asistencia y la comprobación de cámara en dispositivo físico.
