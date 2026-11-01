@@ -43,6 +43,7 @@ backend/.pytest-f3c-*/
 backend/.pytest-f3d-*/
 backend/.pytest-f4b-*/
 backend/.pytest-f4c-*/
+backend/.pytest-f4d-*/
 .coverage
 htmlcov/
 .vitest/

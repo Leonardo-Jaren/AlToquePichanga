@@ -15,11 +15,12 @@ const error = ref('')
 const aviso = ref('')
 const metodoId = ref('')
 const tipoPago = ref('adelanto')
+const aceptaCondiciones = ref(false)
 const referencia = ref('')
 const observacion = ref('')
 const pagoActivo = computed(() => reserva.value?.pagos?.find((pago) => ['pendiente_pago', 'pendiente_revision'].includes(pago.estado)) || null)
 const pagoReciente = computed(() => reserva.value?.pagos?.[0] || null)
-const pagable = computed(() => reserva.value && ['retenida', 'pendiente_pago', 'pendiente_confirmacion'].includes(reserva.value.estado_reserva))
+const pagable = computed(() => reserva.value && ['retenida', 'pendiente_pago', 'pendiente_confirmacion', 'confirmada'].includes(reserva.value.estado_reserva))
 const metodoActivo = computed(() => reserva.value?.metodos?.find((metodo) => String(metodo.id) === String(metodoId.value)) || pagoActivo.value?.metodo)
 const saldoVisible = computed(() => Number(reserva.value?.saldo_pendiente || 0))
 const esPagoRestante = computed(() => Number(reserva.value?.importe_pagado || 0) > 0)
@@ -53,6 +54,7 @@ async function solicitarPago() {
   try {
     await pagosApi.solicitar(route.params.codigo, {
       tipo: tipoPago.value, metodo_id: Number(metodoId.value), clave_idempotencia: generarClavePago(),
+      acepta_condiciones: aceptaCondiciones.value, version_condiciones: reserva.value.condiciones_cancelacion.version,
     })
     await cargar()
     aviso.value = 'Solicitud de pago creada. Revisa las instrucciones y envía tu captura por WhatsApp.'
@@ -138,7 +140,7 @@ function mostrarHorario() {
           </article>
 
           <article v-if="pagoReciente?.requiere_conciliacion" class="pago-alerta conciliacion" role="status">
-            <CircleAlert aria-hidden="true" /><span>Se registró un pago cuando la reserva ya había vencido. La sede debe revisar la conciliación manualmente.</span>
+            <CircleAlert aria-hidden="true" /><span>El pago requiere revisión. La sede debe revisar la conciliación manualmente.</span>
           </article>
         </section>
 
@@ -160,8 +162,8 @@ function mostrarHorario() {
           </template>
           <template v-else-if="pagoReciente?.estado === 'aprobado' && saldoVisible === 0">
             <span class="estado-pago estado-aprobado"><BadgeCheck aria-hidden="true" />Pago revisado</span>
-            <h2 id="elige-pago">Tu reserva está pendiente de confirmación</h2>
-            <p class="texto-muted">La aprobación del pago quedó registrada. La confirmación final y el ticket QR corresponden al siguiente paso del sistema.</p>
+            <h2 id="elige-pago">{{ reserva.estado_reserva === 'confirmada' ? 'Tu reserva está confirmada' : 'Tu pago requiere revisión' }}</h2>
+            <p class="texto-muted">{{ reserva.estado_reserva === 'confirmada' ? 'Consulta el ticket desde Mis reservas.' : 'Contacta a la sede para revisar el estado de la reserva.' }}</p>
           </template>
           <template v-else>
             <p v-if="pagoReciente?.estado === 'rechazado'" class="pago-alerta compacto" role="status">
@@ -196,7 +198,15 @@ function mostrarHorario() {
             </fieldset>
             <div v-else class="sin-metodos"><CircleAlert aria-hidden="true" /><span>La sede aún no configuró un medio de pago. Contacta a {{ reserva.sede }} antes de pagar.</span></div>
 
-            <div v-if="metodoActivo" class="instrucciones-metodo" aria-live="polite">
+            <section v-if="!pagoActivo" class="pago-card" aria-labelledby="condiciones-cancelacion">
+              <h3 id="condiciones-cancelacion">Condiciones de cancelación</h3>
+              <template v-if="reserva.condiciones_cancelacion">
+                <p class="texto-muted" style="white-space: pre-wrap">{{ reserva.condiciones_cancelacion.texto }}</p>
+                <label><input v-model="aceptaCondiciones" type="checkbox"> He leído y acepto las condiciones de cancelación de la sede.</label>
+              </template>
+              <p v-else role="alert">La sede aún no configuró sus condiciones. No inicies un pago; contacta a la sede.</p>
+            </section>
+            <div v-if="metodoActivo && pagoActivo" class="instrucciones-metodo" aria-live="polite">
               <div v-if="metodoActivo.imagen_qr_url" class="qr-metodo"><img :src="metodoActivo.imagen_qr_url" :alt="`QR de ${metodoActivo.etiqueta} para ${metodoActivo.titular}`"></div>
               <div class="datos-metodo"><strong>{{ metodoActivo.titular }}</strong>
                 <span v-if="metodoActivo.banco">{{ metodoActivo.banco }}</span>
@@ -206,7 +216,7 @@ function mostrarHorario() {
               </div>
             </div>
 
-            <BotonBase v-if="pagoActivo?.estado !== 'pendiente_pago'" variante="primario" tamano="grande" class="w-full" :deshabilitado="!reserva.metodos.length || !metodoId || enviando || !pagable" :cargando="enviando" @click="solicitarPago">
+            <BotonBase v-if="pagoActivo?.estado !== 'pendiente_pago'" variante="primario" tamano="grande" class="w-full" :deshabilitado="!reserva.metodos.length || !metodoId || enviando || !pagable || !aceptaCondiciones || !reserva.condiciones_cancelacion" :cargando="enviando" @click="solicitarPago">
               {{ enviando ? 'Preparando…' : `Continuar · ${soles(montoSeleccionado)}` }}
             </BotonBase>
             <div v-else class="pago-pendiente-acciones">

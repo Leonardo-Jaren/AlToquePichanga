@@ -44,6 +44,8 @@ class SolicitudPagoEntrada(EntradaEstricta):
     tipo = serializers.ChoiceField(choices=TipoPagoReserva.choices)
     metodo_id = serializers.IntegerField(min_value=1)
     clave_idempotencia = serializers.UUIDField()
+    acepta_condiciones = serializers.BooleanField()
+    version_condiciones = serializers.IntegerField(min_value=1)
 
 
 class DeclararComprobanteEntrada(EntradaEstricta):

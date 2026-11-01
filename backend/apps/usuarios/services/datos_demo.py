@@ -342,14 +342,16 @@ def crear_datos_demo(credenciales: dict) -> None:
     sedes = _obtener_sedes(empresas)
     canchas = _obtener_canchas(sedes)
     from apps.usuarios.services.datos_demo_horarios import crear_horarios_demo
-    from apps.usuarios.services.datos_demo_pagos import crear_pagos_demo
-    from apps.usuarios.services.datos_demo_reservas import crear_reservas_demo
+    from apps.usuarios.services.datos_demo_pagos import (
+        crear_condiciones_demo,
+        crear_medios_demo,
+    )
     from apps.usuarios.services.datos_demo_tarifas import crear_tarifas_demo
 
     crear_horarios_demo(sedes, canchas, usuarios)
     crear_tarifas_demo(canchas, usuarios)
-    reservas = crear_reservas_demo(canchas, usuarios)
-    crear_pagos_demo(sedes, reservas, usuarios)
+    crear_medios_demo(sedes)
+    crear_condiciones_demo(sedes, usuarios["dueno_a"], usuarios["dueno_b"])
     _validar_membresias_esperadas(usuarios, empresas)
 
     _obtener_membresia(usuarios["dueno_a"], empresas["empresa_a"], RolEmpresa.DUENO)

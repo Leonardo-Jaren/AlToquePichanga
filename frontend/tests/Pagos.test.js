@@ -22,7 +22,7 @@ const base = {
   estado_reserva: 'retenida', moneda: 'PEN', importe_total: '50.00',
   adelanto_minimo: '25.00', importe_pagado: '0.00', saldo_pendiente: '50.00',
   vence_en: '2026-10-25T20:15:00Z', whatsapp_url: 'https://wa.me/00000000000?text=ATP',
-  habilitado: true, metodos: [metodo], pagos: [],
+  habilitado: true, condiciones_cancelacion: { version: 1, texto: 'Condiciones ficticias de prueba.' }, metodos: [metodo], pagos: [],
 }
 const pagoPendiente = {
   id: 91, codigo_reserva: codigo, estado: 'pendiente_pago', tipo: 'total',
@@ -79,11 +79,14 @@ describe('flujo de pago del jugador', () => {
 
     expect(wrapper.text()).toContain('Adelanto mínimo · 50%')
     await wrapper.get('input[type="radio"][value="total"]').setValue()
+    expect(wrapper.findAll('button').find((boton) => boton.text().includes('Continuar')).attributes('disabled')).toBeDefined()
+    await wrapper.get('input[type="checkbox"]').setValue(true)
     await wrapper.findAll('button').find((boton) => boton.text().includes('Continuar')).trigger('click')
     await flushPromises()
 
     expect(pagosApi.solicitar).toHaveBeenCalledWith(codigo, expect.objectContaining({
       tipo: 'total', metodo_id: metodo.id, clave_idempotencia: expect.any(String),
+      acepta_condiciones: true, version_condiciones: 1,
     }))
     const whatsapp = wrapper.get('a.enlace-whatsapp')
     expect(whatsapp.attributes('href')).toContain('https://wa.me/00000000000?text=')
@@ -155,7 +158,23 @@ describe('cola administrativa de pagos', () => {
     expect(pagosApi.aprobar).toHaveBeenCalledWith(pagoAdmin.id, {
       importe_verificado: 50, motivo: '',
     })
-    expect(wrapper.text()).toContain('La reserva queda pendiente de confirmación')
+    expect(wrapper.text()).toContain('La reserva está confirmada')
+    wrapper.unmount()
+  })
+
+  it('informa cuando un pago queda en conciliación sin confirmar la reserva', async () => {
+    vi.spyOn(pagosApi, 'listarAdministracion').mockResolvedValue({ data: { count: 1, results: [pagoAdmin] } })
+    vi.spyOn(pagosApi, 'listarMedios').mockResolvedValue({ data: [metodo] })
+    vi.spyOn(pagosApi, 'detalleAdministracion').mockResolvedValue({ data: pagoAdmin })
+    vi.spyOn(pagosApi, 'aprobar').mockRejectedValue({ response: { status: 409, data: { requiere_conciliacion: true } } })
+    const wrapper = mount(PagosAdminPanel, { props: { sedes: [{ id: 3, nombre: 'Sede A' }] }, global: { stubs } })
+    await flushPromises()
+    await wrapper.findAll('button').find((boton) => boton.text().includes('Revisar')).trigger('click')
+    await flushPromises()
+    await wrapper.get('[role="dialog"] input[type="number"]').setValue('50.00')
+    await wrapper.findAll('button').find((boton) => boton.text().includes('Aprobar pago')).trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('conciliación manual; la reserva no se confirmó')
     wrapper.unmount()
   })
 

@@ -36,6 +36,8 @@ export default defineConfig({
       env: {
         DEBUG: 'True',
         USE_REDIS_CHANNEL_LAYER: 'False',
+        AUTH_LOGIN_LIMIT: '100',
+        AUTH_LOGIN_IP_LIMIT: '300',
         FRONTEND_URL: `http://localhost:${frontendPort}`,
         CORS_ALLOWED_ORIGINS: `http://localhost:${frontendPort},http://127.0.0.1:${frontendPort}`,
       },

@@ -168,7 +168,7 @@ async function cambiarEstado() {
         <GestionHorariosPanel v-else-if="vista === 'horarios'" :key="'horarios-sede-' + seleccionada.id" :sedes="sedes" :sede-inicial-id="seleccionada.id" :sede-fija="true" />
         <GestionTarifasPanel v-else-if="vista === 'tarifas'" :key="'tarifas-sede-' + seleccionada.id" :sedes="sedes" :sede-inicial-id="seleccionada.id" :sede-fija="true" />
         <CalendarioAdminPanel v-else-if="vista === 'calendario'" :key="'calendario-sede-' + seleccionada.id" :sedes="sedes" :sede-inicial-id="seleccionada.id" :sede-fija="true" />
-        <ReservasAdminPanel v-else-if="vista === 'reservas'" :key="'reservas-sede-' + seleccionada.id" :sede-id="seleccionada.id" />
+        <ReservasAdminPanel puede-cancelar v-else-if="vista === 'reservas'" :key="'reservas-sede-' + seleccionada.id" :sede-id="seleccionada.id" />
         <PagosAdminPanel v-else-if="vista === 'pagos'" :key="'pagos-sede-' + seleccionada.id" :sedes="[seleccionada]" :sede-inicial-id="seleccionada.id" :sede-fija="true" :configurar-medios="true" />
         <section v-else class="admin-card">
         <div class="flex flex-wrap items-start justify-between gap-3">

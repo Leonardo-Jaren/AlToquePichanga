@@ -35,6 +35,9 @@ def _vencer_de_cancha(cancha_id: int, ahora) -> int:
         from apps.pagos.services.pagos import cerrar_pagos_vencidos
 
         cerrar_pagos_vencidos(reserva, ahora)
+        from apps.reservas.services.notificaciones import encolar_vencimiento
+
+        encolar_vencimiento(reserva)
         fechas_afectadas.update(fechas_en_intervalo(reserva.inicio, reserva.fin))
         cantidad += 1
     for fecha in fechas_afectadas:

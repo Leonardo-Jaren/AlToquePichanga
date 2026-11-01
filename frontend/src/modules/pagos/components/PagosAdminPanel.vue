@@ -6,6 +6,7 @@ import BotonBase from '@/shared/components/BotonBase.vue'
 import ModalBase from '@/shared/components/ModalBase.vue'
 import TablaBase from '@/shared/components/TablaBase.vue'
 import MetodoPagoFormulario from './MetodoPagoFormulario.vue'
+import CondicionesSedePanel from './CondicionesSedePanel.vue'
 import RevisionPagoModal from './RevisionPagoModal.vue'
 import { pagosApi } from '../services/pagos'
 import { fechaPago, soles, etiquetaEstadoPago } from '../utils/pagos'
@@ -118,11 +119,14 @@ async function revisar(accion, datos) {
       : await pagosApi.rechazar(seleccion.value.id, datos)
     seleccion.value = data
     aviso.value = accion === 'aprobar'
-      ? 'Pago verificado. La reserva queda pendiente de confirmación.'
+      ? 'Pago verificado. La reserva está confirmada.'
       : 'Comprobante rechazado. El historial conserva el motivo.'
     await cargar()
   } catch (fallo) {
-    error.value = fallo.response?.data?.detail || 'No se pudo guardar la revisión.'
+    if (fallo.response?.status === 409 && fallo.response?.data?.requiere_conciliacion) {
+      aviso.value = 'El pago quedó registrado para conciliación manual; la reserva no se confirmó.'
+      await cargar()
+    } else error.value = fallo.response?.data?.detail || 'No se pudo guardar la revisión.'
     if (seleccion.value) {
       try { seleccion.value = (await pagosApi.detalleAdministracion(seleccion.value.id)).data } catch { /* conserva el detalle previo */ }
     }
@@ -178,6 +182,7 @@ function medioGuardado() {
       </TablaBase>
     </section>
 
+    <CondicionesSedePanel v-if="configurarMedios" :sede-id="sedeId" />
     <section v-if="configurarMedios" class="config-medios">
       <header class="config-medios-heading"><div class="config-medios-icono"><Settings2 aria-hidden="true" /></div><div><p class="pagos-eyebrow">Datos visibles al jugador</p><h2>Medios de pago de {{ nombreSede || 'la sede' }}</h2><p>Usa cuentas propias de esta sede. El dinero de las reservas no pasa por AlToque.</p></div></header>
       <label v-if="disponibles.length > 1 && !sedeFija" class="max-w-md"><span class="admin-label">Configurar sede</span><select v-model="sedeId" class="admin-field"><option v-for="sede in disponibles" :key="sede.id" :value="String(sede.id)">{{ sede.nombre }}</option></select></label>

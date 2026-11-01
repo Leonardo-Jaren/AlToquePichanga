@@ -98,7 +98,10 @@ class ReservasAdministrativasView(APIView):
 
     def get(self, request: Request) -> Response:
         _exigir_personal(request.user)
-        entrada = FiltrosReservasEntrada(data=request.query_params)
+        filtros = request.query_params.copy()
+        filtros.pop("page", None)
+        filtros.pop("page_size", None)
+        entrada = FiltrosReservasEntrada(data=filtros)
         entrada.is_valid(raise_exception=True)
         datos = entrada.validated_data
         canchas = canchas_visibles(request.user)

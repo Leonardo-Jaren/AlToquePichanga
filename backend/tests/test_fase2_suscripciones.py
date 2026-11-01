@@ -116,7 +116,7 @@ def test_estado_efectivo_y_gracia_de_suscripcion_configurable(crear_usuario):
     empresa = crear_empresa(usuario, "Vigencia")
     plan = crear_plan()
     suscripcion = activar_suscripcion(empresa, plan)
-    ConfiguracionSuscripcion.objects.create(dias_gracia=2, actualizado_por=superadmin)
+    ConfiguracionSuscripcion.objects.create(pk=1, dias_gracia=2, actualizado_por=superadmin)
     hoy = suscripcion.fecha_vencimiento + timedelta(days=1)
     suscripcion.fecha_vencimiento = hoy - timedelta(days=1)
     suscripcion.save(update_fields=["fecha_vencimiento"])

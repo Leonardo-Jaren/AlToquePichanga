@@ -4,6 +4,8 @@ import { CalendarClock, Clock3, Filter, RefreshCw, Search } from 'lucide-vue-nex
 import BotonBase from '@/shared/components/BotonBase.vue'
 import TablaBase from '@/shared/components/TablaBase.vue'
 import DetalleReservaModal from './DetalleReservaModal.vue'
+import ValidarIngreso from './ValidarIngreso.vue'
+import CancelacionReservaModal from './CancelacionReservaModal.vue'
 import { formatearPEN } from '@/modules/tarifas/utils/tarifas'
 import { fechaEtiqueta, horaEtiqueta } from '@/modules/calendario/utils/fechas'
 import { reservasApi } from '../services/reservas'
@@ -21,6 +23,7 @@ const columnas = [
   { key: 'acciones', label: 'Detalle' },
 ]
 const props = defineProps({
+  puedeCancelar: { type: Boolean, default: false },
   sedeId: { type: [Number, String], default: '' },
   empresaId: { type: [Number, String], default: '' },
 })
@@ -32,6 +35,7 @@ const paginas = ref(1)
 const cargando = ref(false)
 const error = ref('')
 const modalAbierto = ref(false)
+const cancelacionAbierta = ref(false)
 const detalle = ref(null)
 const cargandoDetalle = ref(false)
 const vigentesPagina = computed(() => reservas.value.filter((reserva) => reserva.estado === 'retenida').length)
@@ -91,10 +95,12 @@ function fechaVencimiento(reserva) {
       <div>
         <p class="reservas-eyebrow">Turnos de tus sedes autorizadas</p>
         <h2 id="reservas-admin-titulo">Solicitudes de reserva</h2>
-        <p>Consulta retenciones y cotizaciones guardadas. La validación de pago llegará en otra fase.</p>
+        <p>Consulta reservas y valida el ingreso de jugadores.</p>
       </div>
       <BotonBase @click="cargar(1)"><template #icono-inicio><RefreshCw aria-hidden="true" /></template>Actualizar</BotonBase>
     </header>
+
+    <ValidarIngreso />
 
     <form class="reservas-filtros" @submit.prevent="cargar(1)">
       <label class="reservas-busqueda">
@@ -102,7 +108,7 @@ function fechaVencimiento(reserva) {
         <Search aria-hidden="true" />
         <input v-model.trim="filtros.q" type="search" maxlength="80" placeholder="Buscar código, jugador o cancha…">
       </label>
-      <label><span>Estado</span><select v-model="filtros.estado"><option value="">Todos</option><option value="retenida">Retenida</option><option value="vencida">Vencida</option><option value="cancelada">Cancelada</option></select></label>
+      <label><span>Estado</span><select v-model="filtros.estado"><option value="">Todos</option><option value="retenida">Retenida</option><option value="confirmada">Confirmada</option><option value="vencida">Vencida</option><option value="cancelada">Cancelada</option></select></label>
       <label><span>Desde</span><input v-model="filtros.desde" type="date"></label>
       <label><span>Hasta</span><input v-model="filtros.hasta" type="date"></label>
       <BotonBase variante="primario" tipo="submit"><template #icono-inicio><Filter aria-hidden="true" /></template>Filtrar</BotonBase>
@@ -135,7 +141,10 @@ function fechaVencimiento(reserva) {
         <BotonBase :deshabilitado="pagina >= paginas || cargando" @click="cargar(pagina + 1)">Siguiente</BotonBase>
       </nav>
     </section>
-    <DetalleReservaModal v-model="modalAbierto" :reserva="detalle" :cargando="cargandoDetalle" administrativa />
+    <CancelacionReservaModal v-model="cancelacionAbierta" :codigo="detalle?.codigo || ''" :condiciones="detalle?.condiciones_cancelacion || ''" administrativa @cancelada="cargar(pagina)" />
+    <DetalleReservaModal v-model="modalAbierto" :reserva="detalle" :cargando="cargandoDetalle" administrativa>
+      <template #acciones><BotonBase v-if="puedeCancelar && ['retenida', 'pendiente_pago', 'pendiente_verificacion', 'pendiente_confirmacion', 'confirmada'].includes(detalle?.estado)" @click="modalAbierto = false; cancelacionAbierta = true">Cancelar reserva</BotonBase></template>
+    </DetalleReservaModal>
   </section>
 </template>
 

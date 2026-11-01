@@ -1,5 +1,7 @@
 # Usuarios de prueba — Fases 3B, 3C, 3D, 4A y 4B
 
+> Actualización 4D: el generador prepara únicamente datos maestros y medios ficticios. Ya no crea reservas ni pagos; los ejemplos antiguos de bloques prellenados descritos abajo son históricos. Crea una reserva manual para recorrer pagos. Los registros existentes no se borran.
+
 Este fixture sirve para recorrer horarios, tarifas, calendario, retenciones y disponibilidad en tiempo real con siete cuentas ficticias locales. Todas las cuentas usan el inicio de sesión normal de la aplicación (`/ingresar`, correo y contraseña); el comando no agrega rutas especiales ni omite permisos. La consulta pública está disponible en `/canchas-publicas` y no necesita sesión; solicitar o consultar reservas sí requiere iniciar sesión.
 
 ## Crear los datos
@@ -183,7 +185,7 @@ No la ejecutes contra producción.
 
 ## Pagos manuales — Fase 4C
 
-El generador idempotente conserva las cuentas anteriores y agrega métodos/pagos de prueba en
+El generador idempotente conserva las cuentas anteriores y agrega medios de pago ficticios en
 las cuatro sedes demo. Para actualizar la base local, aplica migraciones y ejecuta el seeder
 protegido (no imprime ni cambia contraseñas que sigan siendo válidas):
 
@@ -225,3 +227,18 @@ los pagos están apagados por defecto cuando `DEBUG=False`. La E2E automatiza ju
 con contextos Chromium independientes en claro móvil y oscuro escritorio mediante
 `npm run test:e2e -- e2e/pagos-manuales.spec.js`. El test verifica el `href` de WhatsApp sin
 abrirlo, no envía mensajes ni usa servicios externos.
+
+## Condiciones de cancelación y acceso 4D
+
+En **Pagos**, el dueño o administrador autorizado elige su sede y guarda el texto de sus
+condiciones; cada cambio crea una versión nueva. En desarrollo, el generador crea condiciones
+explícitamente ficticias y marcadas para las sedes demo. El jugador las lee y acepta antes de
+crear la solicitud; si la versión cambió, la API exige volver a consultar. La aceptación
+conserva texto, versión, usuario y fecha. Los datos de cuenta y el enlace de WhatsApp se
+entregan tras crear la solicitud con aceptación registrada. El texto real de cada sede requiere
+revisión legal; no activar pagos de producción hasta resolver las decisiones pendientes.
+
+El cajero consulta **Reservas → Validar ingreso**, escanea en navegadores compatibles o
+escribe el código. El servidor solo admite el horario en curso, sin margen anticipado aprobado.
+El jugador abre **Mis reservas → Ver ticket** o **Ver detalle → Cancelar reserva**. Las
+cancelaciones con pagos quedan para revisión y nunca ejecutan devoluciones automáticamente.

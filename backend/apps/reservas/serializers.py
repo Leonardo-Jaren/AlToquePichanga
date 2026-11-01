@@ -34,6 +34,7 @@ class ReservaLecturaSerializer(serializers.ModelSerializer):
     sede_nombre = serializers.CharField(source="cancha.sede.nombre", read_only=True)
     empresa_nombre = serializers.CharField(source="cancha.sede.empresa.nombre_visible", read_only=True)
     jugador = serializers.SerializerMethodField()
+    condiciones_cancelacion = serializers.SerializerMethodField()
 
     class Meta:
         model = Reserva
@@ -41,9 +42,13 @@ class ReservaLecturaSerializer(serializers.ModelSerializer):
             "codigo", "cancha_id", "cancha_nombre", "sede_nombre", "empresa_nombre",
             "inicio", "fin", "duracion_horas", "importe_total", "adelanto_minimo",
             "moneda", "estado", "retencion_vence_en", "cotizacion_aplicada",
-            "creada_en", "jugador",
+            "creada_en", "jugador", "condiciones_cancelacion",
         ]
         read_only_fields: ClassVar[list[str]] = fields
+
+    def get_condiciones_cancelacion(self, reserva: Reserva) -> str | None:
+        aceptacion = reserva.aceptaciones_cancelacion.order_by("-aceptada_en", "-id").first()
+        return aceptacion.texto_aceptado if aceptacion else None
 
     def get_jugador(self, reserva: Reserva) -> dict | None:
         if not self.context.get("administrativa"):

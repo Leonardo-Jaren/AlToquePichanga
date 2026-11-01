@@ -7,6 +7,8 @@ import TablaBase from '@/shared/components/TablaBase.vue'
 import { formatearPEN, mensajeErrorApi } from '@/modules/tarifas/utils/tarifas'
 import { fechaEtiqueta, horaEtiqueta } from '@/modules/calendario/utils/fechas'
 import DetalleReservaModal from '../components/DetalleReservaModal.vue'
+import TicketReservaModal from '../components/TicketReservaModal.vue'
+import CancelacionReservaModal from '../components/CancelacionReservaModal.vue'
 import { reservasApi } from '../services/reservas'
 import { etiquetaEstadoReserva } from '../utils/reservas'
 
@@ -25,6 +27,9 @@ const cancelando = ref(false)
 const error = ref('')
 const aviso = ref('')
 const modalAbierto = ref(false)
+const ticketAbierto = ref(false)
+const cancelacionAbierta = ref(false)
+const codigoTicket = ref('')
 const confirmandoCancelacion = ref(false)
 const detalle = ref(null)
 const cargandoDetalle = ref(false)
@@ -76,6 +81,17 @@ async function confirmarCancelacion() {
   } finally { cancelando.value = false }
 }
 
+function abrirCancelacion() { modalAbierto.value = false; cancelacionAbierta.value = true }
+async function cancelacionCompletada(datos) {
+  aviso.value = datos.requiere_revision ? 'Reserva cancelada. La sede revisará los pagos registrados.' : 'Reserva cancelada y horario liberado.'
+  await cargar(pagina.value)
+}
+
+function abrirTicket(reserva) {
+  codigoTicket.value = reserva.codigo
+  ticketAbierto.value = true
+}
+
 function mostrarHorario(reserva) {
   return `${fechaEtiqueta(reserva.inicio.slice(0, 10))} · ${horaEtiqueta(reserva.inicio)}–${horaEtiqueta(reserva.fin)}`
 }
@@ -114,7 +130,7 @@ function fechaVencimiento(reserva) {
           <template #celda-importe="{ fila }">{{ formatearPEN(fila.importe_total, fila.moneda) }}</template>
           <template #celda-estado="{ fila }"><span class="reserva-estado" :class="`reserva-estado-${fila.estado}`">{{ etiquetaEstadoReserva(fila.estado) }}</span></template>
           <template #celda-vence="{ fila }"><span class="reserva-horario">{{ fechaVencimiento(fila) }}</span></template>
-          <template #celda-acciones="{ fila }"><div class="flex flex-wrap gap-2"><BotonBase tamano="pequeno" @click="verDetalle(fila)">Ver detalle</BotonBase><RouterLink class="enlace-pago" :to="`/mis-reservas/${fila.codigo}/pago`">Pago</RouterLink></div></template>
+          <template #celda-acciones="{ fila }"><div class="flex flex-wrap gap-2"><BotonBase tamano="pequeno" @click="verDetalle(fila)">Ver detalle</BotonBase><BotonBase v-if="fila.estado === 'confirmada'" tamano="pequeno" @click="abrirTicket(fila)">Ver ticket</BotonBase><RouterLink class="enlace-pago" :to="`/mis-reservas/${fila.codigo}/pago`">Pago</RouterLink></div></template>
         </TablaBase>
         <nav class="mis-reservas-paginacion" aria-label="Páginas de reservas">
           <BotonBase :deshabilitado="pagina <= 1 || cargando" @click="cargar(pagina - 1)">Anterior</BotonBase>
@@ -123,8 +139,11 @@ function fechaVencimiento(reserva) {
         </nav>
       </section>
     </main>
+    <CancelacionReservaModal v-model="cancelacionAbierta" :codigo="detalle?.codigo || ''" :condiciones="detalle?.condiciones_cancelacion || ''" @cancelada="cancelacionCompletada" />
+    <TicketReservaModal v-model="ticketAbierto" :codigo="codigoTicket" />
     <DetalleReservaModal v-model="modalAbierto" :reserva="detalle" :cargando="cargandoDetalle">
       <template #acciones>
+        <BotonBase v-if="['pendiente_pago', 'pendiente_verificacion', 'pendiente_confirmacion', 'confirmada'].includes(detalle?.estado)" @click="abrirCancelacion">Cancelar reserva</BotonBase>
         <template v-if="detalle?.estado === 'retenida' && !confirmandoCancelacion">
           <BotonBase variante="secundario" :deshabilitado="cancelando" @click="confirmandoCancelacion = true"><template #icono-inicio><CircleX aria-hidden="true" /></template>Cancelar retención</BotonBase>
         </template>

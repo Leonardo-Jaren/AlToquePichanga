@@ -3,8 +3,14 @@ import api from '@/shared/services/api'
 export const reservasApi = {
   solicitar: (datos) => api.post('/reservas/', datos),
   listarPropias: (params = {}) => api.get('/reservas/mias/', { params }),
+  ticket: (codigo) => api.get(`/reservas/${codigo}/ticket/`),
+  ticketQr: (codigo) => api.get(`/reservas/${codigo}/ticket/qr/`, { responseType: 'blob' }),
   obtenerPropia: (codigo) => api.get(`/reservas/${codigo}/`),
+  cancelarReserva: (codigo, datos) => api.post(`/reservas/${codigo}/cancelacion/`, datos),
+  cancelarAdministracion: (codigo, datos) => api.post(`/reservas/administracion/${codigo}/cancelar/`, datos),
   cancelar: (codigo) => api.post(`/reservas/${codigo}/cancelar/`, {}),
+  consultarIngreso: (datos) => api.post('/reservas/administracion/ingreso/consultar/', datos),
+  registrarIngreso: (datos) => api.post('/reservas/administracion/ingreso/registrar/', datos),
   listarAdministracion: (params = {}) => api.get('/reservas/administracion/', { params }),
   obtenerAdministracion: (codigo) => api.get(`/reservas/administracion/${codigo}/`),
   disponibilidadAdministracion: (canchaId, desde, hasta) => api.get(

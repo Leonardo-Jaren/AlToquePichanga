@@ -47,7 +47,7 @@ const titulos = {
     <GestionHorariosPanel v-else-if="seccion === 'horarios'" :cargar-sedes="true" />
     <GestionTarifasPanel v-else-if="seccion === 'tarifas'" :cargar-sedes="true" />
     <CalendarioAdminPanel v-else-if="seccion === 'calendario'" :cargar-sedes="true" />
-    <ReservasAdminPanel v-else-if="seccion === 'reservas'" />
+    <ReservasAdminPanel puede-cancelar v-else-if="seccion === 'reservas'" />
     <PagosAdminPanel v-else-if="seccion === 'pagos'" :cargar-sedes="true" />
     <PlanesPanel v-else-if="seccion === 'planes'" />
     <SolicitudesPanel v-else-if="seccion === 'solicitudes'" />

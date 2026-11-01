@@ -206,17 +206,21 @@ AUTH_LOGIN_LIMIT = int(os.getenv("AUTH_LOGIN_LIMIT", "10"))
 AUTH_LOGIN_IP_LIMIT = int(os.getenv("AUTH_LOGIN_IP_LIMIT", "60"))
 AUTH_PUBLIC_LIMIT = int(os.getenv("AUTH_PUBLIC_LIMIT", "20"))
 INVITACION_DIAS_VIGENCIA = int(os.getenv("INVITACION_DIAS_VIGENCIA", "7"))
-MAILERS = {"default": {
-    "BACKEND": os.getenv("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend"),
-    "OPTIONS": {
+EMAIL_BACKEND_CONFIGURADO = os.getenv(
+    "EMAIL_BACKEND",
+    "django.core.mail.backends.locmem.EmailBackend" if DEBUG
+    else "django.core.mail.backends.smtp.EmailBackend",
+)
+MAILERS = {"default": {"BACKEND": EMAIL_BACKEND_CONFIGURADO}}
+if EMAIL_BACKEND_CONFIGURADO == "django.core.mail.backends.smtp.EmailBackend":
+    MAILERS["default"]["OPTIONS"] = {
         "host": os.getenv("EMAIL_HOST", "localhost"),
         "port": int(os.getenv("EMAIL_PORT", "587")),
         "username": os.getenv("EMAIL_HOST_USER", ""),
         "password": os.getenv("EMAIL_HOST_PASSWORD", ""),
         "use_tls": os.getenv("EMAIL_USE_TLS", "True").lower() == "true",
         "timeout": 10,
-    },
-}}
+    }
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "no-reply@localhost")
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")

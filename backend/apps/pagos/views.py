@@ -78,6 +78,7 @@ class SolicitudPagoPropiaView(APIView):
         datos = entrada.validated_data
         pago = crear_solicitud_pago(
             request.user, codigo, datos["tipo"], datos["metodo_id"], datos["clave_idempotencia"],
+            datos["version_condiciones"], datos["acepta_condiciones"],
         )
         if pago is None:
             return Response({"detail": "La retención venció y el horario fue liberado."}, status=409)

@@ -13,11 +13,12 @@ TRANSICIONES_PERMITIDAS = {
     },
     EstadoReserva.PENDIENTE_VERIFICACION: {
         EstadoReserva.PENDIENTE_PAGO, EstadoReserva.PENDIENTE_CONFIRMACION,
-        EstadoReserva.VENCIDA,
+        EstadoReserva.VENCIDA, EstadoReserva.CANCELADA,
     },
     EstadoReserva.PENDIENTE_CONFIRMACION: {
-        EstadoReserva.PENDIENTE_PAGO, EstadoReserva.VENCIDA,
+        EstadoReserva.PENDIENTE_PAGO, EstadoReserva.VENCIDA, EstadoReserva.CONFIRMADA, EstadoReserva.CANCELADA,
     },
+    EstadoReserva.CONFIRMADA: {EstadoReserva.CANCELADA},
 }
 
 

@@ -14,6 +14,7 @@ from rest_framework.test import APIClient
 from apps.canchas.models import Cancha
 from apps.empresas.models import Empresa, MembresiaEmpresa, RolEmpresa
 from apps.pagos.models import (
+    CondicionCancelacionSede,
     EstadoPagoReserva,
     MetodoPagoSede,
     PagoReserva,
@@ -52,6 +53,7 @@ def _contexto(etiqueta="a"):
         sede=sede, nombre=f"Cancha {etiqueta}", modalidad=7,
         tipo_superficie="Sintético", publicada=True,
     )
+    CondicionCancelacionSede.objects.create(sede=sede, version=1, texto="Condiciones ficticias de prueba", creada_por=dueno)
     ahora = timezone.now()
     inicio = ahora + timedelta(days=3)
     reserva = Reserva.objects.create(
@@ -84,7 +86,7 @@ def _solicitar_pago(contexto, api=None, tipo="adelanto", clave=None):
     return api.post(
         f"/api/pagos/reservas/{contexto['reserva'].codigo}/solicitudes/",
         {"tipo": tipo, "metodo_id": contexto["metodo"].pk,
-         "clave_idempotencia": str(clave or uuid4())}, format="json",
+         "clave_idempotencia": str(clave or uuid4()), "version_condiciones": 1, "acepta_condiciones": True}, format="json",
     )
 
 
@@ -96,11 +98,8 @@ def test_jugador_ve_solo_su_pago_y_whatsapp_no_aprueba_automaticamente():
     vista = api_jugador.get(f"/api/pagos/reservas/{contexto['reserva'].codigo}/")
     assert vista.status_code == 200
     assert vista.data["metodos"][0]["tipo"] == "yape"
-    enlace = urlparse(vista.data["whatsapp_url"])
-    assert enlace.netloc == "wa.me"
-    texto = parse_qs(enlace.query)["text"][0]
-    assert contexto["reserva"].codigo in texto
-    assert "Adjuntaré la captura manualmente" in texto
+    assert vista.data["whatsapp_url"] is None
+    assert vista.data["metodos"][0]["numero_cuenta"] == ""
 
     solicitud = _solicitar_pago(contexto, api_jugador)
     assert solicitud.status_code == 201, solicitud.data
@@ -109,6 +108,12 @@ def test_jugador_ve_solo_su_pago_y_whatsapp_no_aprueba_automaticamente():
     assert contexto["reserva"].__class__.objects.get(pk=contexto["reserva"].pk).estado == EstadoReserva.PENDIENTE_PAGO
     assert not PagoReserva.objects.get(pk=solicitud.data["id"]).declarado_en
     vista_con_solicitud = api_jugador.get(f"/api/pagos/reservas/{contexto['reserva'].codigo}/")
+    enlace = urlparse(vista_con_solicitud.data["whatsapp_url"])
+    assert enlace.netloc == "wa.me"
+    texto = parse_qs(enlace.query)["text"][0]
+    assert contexto["reserva"].codigo in texto
+    assert "Adjuntaré la captura manualmente" in texto
+    assert vista_con_solicitud.data["metodos"][0]["numero_cuenta"]
     texto_solicitud = parse_qs(urlparse(vista_con_solicitud.data["whatsapp_url"]).query)["text"][0]
     assert "Monto a verificar: S/ 25.00" in texto_solicitud
 
@@ -126,7 +131,7 @@ def test_jugador_ve_solo_su_pago_y_whatsapp_no_aprueba_automaticamente():
 
 
 @pytest.mark.django_db
-def test_cajero_revisa_adelanto_y_saldo_sin_confirmar_la_reserva():
+def test_cajero_confirma_adelanto_y_revisa_saldo():
     contexto = _contexto("saldo")
     api_jugador = _api(contexto["jugador"])
     api_cajero = _api(contexto["cajero"])
@@ -144,8 +149,7 @@ def test_cajero_revisa_adelanto_y_saldo_sin_confirmar_la_reserva():
     )
     assert aprobado.status_code == 200, aprobado.data
     reserva = Reserva.objects.get(pk=contexto["reserva"].pk)
-    assert reserva.estado == EstadoReserva.PENDIENTE_CONFIRMACION
-    assert reserva.estado != EstadoReserva.CONFIRMADA
+    assert reserva.estado == EstadoReserva.CONFIRMADA
 
     saldo = _solicitar_pago(contexto, api_jugador, "saldo")
     assert saldo.status_code == 201, saldo.data
@@ -157,7 +161,7 @@ def test_cajero_revisa_adelanto_y_saldo_sin_confirmar_la_reserva():
     )
     assert segundo.status_code == 200, segundo.data
     reserva.refresh_from_db()
-    assert reserva.estado == EstadoReserva.PENDIENTE_CONFIRMACION
+    assert reserva.estado == EstadoReserva.CONFIRMADA
     assert PagoReserva.objects.filter(reserva=reserva, estado=EstadoPagoReserva.APROBADO).count() == 2
 
 
@@ -217,7 +221,9 @@ def test_vencimiento_con_pago_aprobado_marca_conciliacion_y_no_borra_historial()
     )
     caja_api.post(f"/api/pagos/administracion/{pago['id']}/aprobar/", {}, format="json")
     reserva = Reserva.objects.get(pk=contexto["reserva"].pk)
+    # Simula un pago aprobado antes de 4D, todavía sin confirmar.
     Reserva.objects.filter(pk=reserva.pk).update(
+        estado=EstadoReserva.PENDIENTE_CONFIRMACION,
         revision_pago_vence_en=timezone.now() - timedelta(seconds=1),
     )
 
@@ -244,7 +250,7 @@ def test_solicitudes_simultaneas_crean_un_solo_pago_pendiente():
             respuesta = cliente.post(
                 f"/api/pagos/reservas/{contexto['reserva'].codigo}/solicitudes/",
                 {"tipo": "adelanto", "metodo_id": contexto["metodo"].pk,
-                 "clave_idempotencia": str(clave)}, format="json",
+                 "clave_idempotencia": str(clave), "version_condiciones": 1, "acepta_condiciones": True}, format="json",
             )
             return respuesta.status_code
         finally:

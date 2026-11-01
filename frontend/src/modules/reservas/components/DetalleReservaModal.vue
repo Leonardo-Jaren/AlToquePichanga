@@ -51,7 +51,7 @@ const tonoEstado = computed(() => ({
           </li>
         </ul>
       </section>
-      <p class="detalle-reserva-note">La retención aparta el horario temporalmente. No registra un pago ni confirma la reserva.</p>
+      <p v-if="reserva.estado === 'retenida'" class="detalle-reserva-note">La retención aparta el horario temporalmente. No registra un pago ni confirma la reserva.</p>
     </section>
     <p v-else class="detalle-reserva-loading">No se encontró el detalle solicitado.</p>
     <template #pie>

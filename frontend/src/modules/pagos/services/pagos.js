@@ -8,6 +8,8 @@ export const pagosApi = {
   detalleAdministracion: (pagoId) => api.get(`/pagos/administracion/${pagoId}/`),
   aprobar: (pagoId, datos) => api.post(`/pagos/administracion/${pagoId}/aprobar/`, datos),
   rechazar: (pagoId, datos) => api.post(`/pagos/administracion/${pagoId}/rechazar/`, datos),
+  obtenerCondiciones: (sedeId) => api.get(`/pagos/sedes/${sedeId}/condiciones/`),
+  guardarCondiciones: (sedeId, datos) => api.put(`/pagos/sedes/${sedeId}/condiciones/`, datos),
   listarMedios: (sedeId) => api.get(`/pagos/sedes/${sedeId}/medios/`),
   guardarMedio: (sedeId, datos) => api.post(`/pagos/sedes/${sedeId}/medios/`, datos, {
     headers: { 'Content-Type': 'multipart/form-data' },

@@ -349,3 +349,17 @@ su vencimiento sin completar la fase posterior conserva el registro contable, li
 bloque y requiere conciliación manual. La duración y la habilitación en producción están
 pendientes de aprobación comercial; `PAGOS_RESERVA_HABILITADOS` queda desactivado por defecto
 cuando `DEBUG=False`.
+
+## 4D — implementación parcial
+
+Pagos, reserva, bloques y confirmación se coordinan bajo bloqueos de PostgreSQL; los eventos
+se publican con `on_commit`. `AsistenciaReserva` usa una relación única con la reserva;
+`NotificacionReserva` une cada evento a la cola de correo existente. El QR lleva únicamente
+el código firmado y se valida contra estado y alcance del servidor. Las migraciones
+`reservas.0003` y `0004` son aditivas. Ver `ESTADO_PROYECTO.md` para endpoints y pendientes.
+
+Las condiciones de cancelación por sede y su aceptación versionada se gestionan mediante
+`GET/PUT /api/pagos/sedes/<id>/condiciones/` y el contrato de solicitud de pago. Las cuentas
+operativas de pago no se devuelven al jugador hasta que exista una solicitud con aceptación.
+`pagos.0002` crea el histórico sin alterar reservas previas. El texto legal es responsabilidad
+de cada sede y requiere revisión antes de producción.

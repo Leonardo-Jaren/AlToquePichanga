@@ -306,3 +306,47 @@ equipo; Channels quedó cubierto con InMemory y la integración Redis debe verif
 entorno que lo proporcione. No se habilitó el procesamiento de pagos en producción; las
 decisiones comerciales pendientes, el plazo provisional y el alcance excluido de Fase 4D siguen
 documentados en `docs/DECISIONES.md`.
+
+## Fase 4D — validación parcial
+
+- Servicio interno de confirmación: 3 pruebas enfocadas aprobadas (pago insuficiente,
+  retención vencida, alcance cruzado, bloques liberados e idempotencia).
+- Vitest existente: 117 aprobadas, sin pruebas nuevas de 4D; compilación de producción,
+  Django check, Ruff y comprobación de migraciones aprobados.
+- Playwright interrumpido: su preparación llama `generar_datos_demo`, que actualmente
+  crea reservas y pagos pese a la prohibición de la sección 12 de AGENTS.md. Adaptar las
+  pruebas para usar una base y datos de prueba aislados sin ese generador antes de ejecutarlas.
+- No se han implementado las vistas 4D ni se ha hecho validación visual. Persisten pendientes
+  las pruebas integrales de concurrencia, el flujo de pago, QR, correo y cancelación.
+- Pytest general iniciado pero interrumpido antes de las pruebas que invocan el generador
+  heredado; no se cuenta como suite aprobada. La prueba enfocada se repitió tras el último
+  cambio: 3 aprobadas. La validación con Redis real no se ejecutó en este avance.
+
+## Validación 4D — continuación
+
+La prueba anterior de suscripción asumía que PostgreSQL reiniciaba su secuencia de IDs al
+reutilizar la base. Se fijó explícitamente el ID 1 de la configuración singleton, sin reducir
+la cobertura de gracia. El directorio temporal predeterminado de Windows devolvió acceso
+denegado; pytest se ejecutó con `--basetemp` en el proyecto.
+
+El recorrido de Playwright cubre aceptación, pago ficticio, aprobación, ticket, QR y
+cancelación; otro cubre retención y liberación en tiempo real. Playwright eleva solo en su
+servidor local los límites configurables de login para evitar bloqueo al repetir recorridos;
+las pruebas de seguridad de autenticación conservan sus límites. Aún falta el E2E de ingreso
+con reserva en curso y una prueba de cámara en un dispositivo físico. Se revisaron capturas de
+ticket en móvil y escritorio, claro y oscuro; cancelación y panel de ingreso también se
+revisaron en navegador. SMTP real y Redis real no han sido validados; Redis no escucha en el
+puerto local 6379. No hay transferencias ni envíos reales de correo en estas pruebas.
+
+### Resultados de la continuación
+
+- Vitest: 126 pruebas aprobadas; Playwright: 2 escenarios aprobados. Un intento anterior de
+  Playwright falló por el límite de login acumulado; se volvió a ejecutar con límites de prueba
+  locales configurados, sin omitir autenticación. Otro intento previo señaló un selector de
+  texto ambiguo tras mostrar las condiciones aceptadas; se corrigió y se repitió.
+- Última suite backend completa previa a los avisos adicionales: 149 aprobadas y una omitida
+  por Redis; las 23 pruebas enfocadas posteriores de avisos, cancelación, reservas y pagos
+  pasaron. Ejecutar nuevamente la suite completa con los dos casos adicionales para el cierre.
+- `ruff check .`, `manage.py check`, `makemigrations --check --dry-run` y `npm run build`
+  pasaron. La configuración de correo de desarrollo usa locmem salvo que el entorno indique
+  explícitamente otro backend. No se verificó entrega SMTP externa.

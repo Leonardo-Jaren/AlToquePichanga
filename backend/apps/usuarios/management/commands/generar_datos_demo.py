@@ -60,6 +60,16 @@ con las pruebas de concurrencia; nunca se siembran dos reservas activas que choq
 - El botón de WhatsApp solo prepara el mensaje. La captura se adjunta manualmente y el
   estado no cambia a aprobado hasta que un empleado lo revise.
 """
+_GUIA_LOCAL_ANTERIOR_FASE4C = _GUIA_LOCAL
+_GUIA_LOCAL = """
+## Comprobaciones manuales de Fase 4B
+
+Inicia sesión en `/ingresar` y consulta `docs/USUARIOS_PRUEBA.md`. Usa las cuentas
+existentes para revisar calendarios, permisos y disponibilidad en dos empresas. Los
+horarios se consultan sin crear reservas ni pagos. Para probar una reserva, créala
+manualmente desde `/canchas-publicas` con un usuario jugador; puedes cancelarla desde
+`/mis-reservas`. Los medios de pago son ficticios: no realices transferencias ni envíos.
+"""
 _GUIA_LOCAL_ANTERIOR_FASE3D = """
 ## Comprobaciones manuales de Fase 3D
 
@@ -213,6 +223,7 @@ def _leer_o_generar_credenciales(ruta: Path) -> tuple[dict, str, str | None]:
                 bloque_anterior + _GUIA_LOCAL_ANTERIOR_FASE3D,
                 bloque_anterior + _GUIA_LOCAL_ANTERIOR_FASE4A,
                 bloque_anterior + _GUIA_LOCAL_ANTERIOR_FASE4B,
+                bloque_anterior + _GUIA_LOCAL_ANTERIOR_FASE4C,
                 bloque_actual,
                 _renderizar(datos),
             }
@@ -309,6 +320,6 @@ class Command(BaseCommand):
                 _actualizar_guia_local(ruta, contenido_anterior or "", credenciales)
         self.stdout.write(self.style.SUCCESS(
             "Datos demo locales listos: 7 cuentas, 2 empresas, 4 sedes, 6 canchas, 22 tarifas "
-            "3 reservas, 12 medios de pago y 5 pagos ficticios. Las contraseñas están solo "
+            "y 12 medios de pago ficticios. Las contraseñas están solo "
             "en docs/USUARIOS_PRUEBA_LOCAL.md."
         ))

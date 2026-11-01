@@ -81,6 +81,8 @@ def url_whatsapp(reserva: Reserva, importe_a_verificar: Decimal | None = None) -
 
 
 def datos_reserva_pago(reserva: Reserva, request=None) -> dict:
+    from apps.pagos.services.condiciones import condicion_actual, datos_condicion
+
     pagos = list(reserva.pagos_reserva.select_related("metodo").prefetch_related("historial__actor"))
     pagado = importe_pagado(reserva)
     pago_activo = next((
@@ -90,6 +92,7 @@ def datos_reserva_pago(reserva: Reserva, request=None) -> dict:
     ), None)
     metodos = MetodoPagoSede.objects.filter(sede_id=reserva.cancha.sede_id, activo=True)
     return {
+        "condiciones_cancelacion": datos_condicion(condicion_actual(reserva.cancha.sede_id)),
         "codigo": reserva.codigo, "cancha": reserva.cancha.nombre,
         "sede": reserva.cancha.sede.nombre, "inicio": reserva.inicio, "fin": reserva.fin,
         "estado_reserva": reserva.estado, "moneda": reserva.moneda,
@@ -97,10 +100,14 @@ def datos_reserva_pago(reserva: Reserva, request=None) -> dict:
         "importe_pagado": pagado,
         "saldo_pendiente": max(reserva.importe_total - pagado, Decimal("0.00")),
         "vence_en": fecha_limite(reserva) if reserva.estado in ESTADOS_CON_PLAZO else None,
-        "whatsapp_url": url_whatsapp(
-            reserva, pago_activo.importe_solicitado if pago_activo else None,
-        ),
-        "metodos": [datos_metodo(metodo, request) for metodo in metodos.order_by("tipo")],
+        "whatsapp_url": url_whatsapp(reserva, pago_activo.importe_solicitado) if pago_activo else None,
+        "metodos": [
+            datos_metodo(metodo, request) if pago_activo else {
+                **datos_metodo(metodo, request), "numero_cuenta": "", "banco": "",
+                "cci": "", "instrucciones": "", "imagen_qr_url": None,
+            }
+            for metodo in metodos.order_by("tipo")
+        ],
         "pagos": [datos_pago(pago, request) for pago in pagos],
     }
 

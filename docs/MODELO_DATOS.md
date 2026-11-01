@@ -241,3 +241,17 @@ valor de desarrollo pendiente de definición comercial. La tarea independiente
 expirar_retenciones vence y libera bloques. El endpoint público actualizado declara
 considera_reservas: true y oculta datos del jugador; las consultas operativas de 3B
 conservan false.
+
+## 4D — adiciones
+
+`AsistenciaReserva` referencia una sola reserva y al empleado, con fecha de registro;
+`NotificacionReserva` relaciona reserva, tipo de aviso y correo pendiente, con unicidad por
+reserva/tipo. Las cancelaciones conservan reservas, pagos e historial; no crean reembolsos.
+
+## Condiciones y aceptación 4D
+
+`CondicionCancelacionSede` conserva versiones inmutables por sede, con una única versión
+activa; `AceptacionCancelacion` guarda referencia, texto, versión, jugador y fecha por reserva.
+La publicación de condiciones y la solicitud de pago bloquean la sede para evitar aceptar una
+versión reemplazada concurrentemente. Las solicitudes de pago requieren aceptación explícita.
+La migración `pagos.0002` agrega ambas tablas sin modificar datos históricos.

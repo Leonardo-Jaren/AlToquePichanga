@@ -153,6 +153,9 @@ def cancelar_retencion(jugador, codigo: str):
     if reserva.estado == EstadoReserva.RETENIDA and reserva.retencion_vence_en <= ahora:
         cambiar_estado(reserva, EstadoReserva.VENCIDA, "Venció el plazo de retención.")
         reserva.bloques.filter(liberado_en__isnull=True).update(liberado_en=ahora)
+        from apps.reservas.services.notificaciones import encolar_vencimiento
+
+        encolar_vencimiento(reserva)
         motivo = "retencion_vencida"
     elif reserva.estado == EstadoReserva.RETENIDA:
         cambiar_estado(reserva, EstadoReserva.CANCELADA, "El jugador canceló la retención.", jugador)

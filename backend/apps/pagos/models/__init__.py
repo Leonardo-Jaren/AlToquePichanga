@@ -1,8 +1,9 @@
+from .condiciones import AceptacionCancelacion, CondicionCancelacionSede
 from .historial import HistorialPagoReserva
 from .metodo import MetodoPagoSede, TipoMetodoPago
 from .pago import EstadoPagoReserva, PagoReserva, TipoPagoReserva
 
 __all__ = [
-    "EstadoPagoReserva", "HistorialPagoReserva", "MetodoPagoSede", "PagoReserva",
+    "AceptacionCancelacion", "CondicionCancelacionSede", "EstadoPagoReserva", "HistorialPagoReserva", "MetodoPagoSede", "PagoReserva",
     "TipoMetodoPago", "TipoPagoReserva",
 ]

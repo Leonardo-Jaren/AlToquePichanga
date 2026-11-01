@@ -12,6 +12,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.pagos.models import (
+    CondicionCancelacionSede,
     EstadoPagoReserva,
     HistorialPagoReserva,
     MetodoPagoSede,
@@ -28,7 +29,7 @@ def _clave_pago(reserva: Reserva, clave: str):
     return uuid5(NAMESPACE_URL, identidad_demo(f"pago:{reserva.pk}:{clave}"))
 
 
-def _medios_demo(sedes: dict) -> dict[tuple[str, str], MetodoPagoSede]:
+def crear_medios_demo(sedes: dict) -> dict[tuple[str, str], MetodoPagoSede]:
     medios = {}
     for sede_clave, sede in sedes.items():
         for tipo in TipoMetodoPago.values:
@@ -128,7 +129,7 @@ def _preparar_reserva_revision(reserva: Reserva, actor, ahora) -> bool:
 @transaction.atomic
 def crear_pagos_demo(sedes: dict, reservas: dict[str, Reserva], usuarios: dict) -> int:
     """Crea únicamente métodos ficticios y pagos ligados a reservas demo estables."""
-    medios = _medios_demo(sedes)
+    medios = crear_medios_demo(sedes)
     jugador = usuarios["jugador"]
     cajero = usuarios["cajero_a"]
     ahora = timezone.now()
@@ -184,3 +185,20 @@ def crear_pagos_demo(sedes: dict, reservas: dict[str, Reserva], usuarios: dict) 
         conciliacion=True,
     )
     return len(medios)
+
+
+def crear_condiciones_demo(sedes: dict, dueno_a, dueno_b) -> None:
+    texto = ("[DEMO ALTOQUE] Condiciones ficticias para pruebas locales. "
+             "Las cancelaciones voluntarias normalmente no generan devolución del adelanto; "
+             "las excepciones y derechos aplicables requieren revisión de la sede.")
+    for clave, sede in sedes.items():
+        existente = CondicionCancelacionSede.objects.filter(sede=sede, activa=True).first()
+        if existente:
+            if not existente.texto.startswith("[DEMO ALTOQUE] Condiciones ficticias"):
+                raise CommandError("La sede demo tiene condiciones ajenas; no se modificaron.")
+            continue
+        if CondicionCancelacionSede.objects.filter(sede=sede).exists():
+            raise CommandError("La sede demo tiene historial de condiciones sin versión activa.")
+        CondicionCancelacionSede.objects.create(
+            sede=sede, version=1, texto=texto, creada_por=dueno_a if clave.startswith("sede_a") else dueno_b,
+        )

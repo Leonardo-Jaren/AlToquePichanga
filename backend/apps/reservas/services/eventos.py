@@ -15,6 +15,8 @@ from redis.exceptions import RedisError
 logger = logging.getLogger(__name__)
 
 MOTIVOS = {
+    "reserva_confirmada",
+    "reserva_cancelada",
     "retencion_creada",
     "retencion_cancelada",
     "retencion_vencida",

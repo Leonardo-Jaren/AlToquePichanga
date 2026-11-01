@@ -76,7 +76,8 @@ def consultar_pago_propietario(jugador, codigo: str, request=None) -> dict | Non
 
 
 @transaction.atomic
-def crear_solicitud_pago(jugador, codigo: str, tipo: str, metodo_id: int, clave) -> PagoReserva | None:
+def crear_solicitud_pago(jugador, codigo: str, tipo: str, metodo_id: int, clave,
+                         version_condiciones: int, acepta_condiciones: bool) -> PagoReserva | None:
     reserva = _reserva_bloqueada(jugador, codigo)
     if reserva is None:
         return None
@@ -89,6 +90,9 @@ def crear_solicitud_pago(jugador, codigo: str, tipo: str, metodo_id: int, clave)
     if reserva.estado in ESTADOS_CON_PLAZO and fecha_limite(reserva) <= ahora:
         _vencer_de_cancha(reserva.cancha_id, ahora)
         return None
+    from apps.pagos.services.condiciones import registrar_aceptacion
+
+    registrar_aceptacion(reserva, jugador, version_condiciones, acepta_condiciones)
     metodo = MetodoPagoSede.objects.select_for_update().filter(
         pk=metodo_id, sede_id=reserva.cancha.sede_id, activo=True,
     ).first()
@@ -105,6 +109,7 @@ def crear_solicitud_pago(jugador, codigo: str, tipo: str, metodo_id: int, clave)
         raise ValidationError({"pago": "Ya hay un pago pendiente de enviar o revisar para esta reserva."})
     if reserva.estado not in {
         EstadoReserva.RETENIDA, EstadoReserva.PENDIENTE_PAGO, EstadoReserva.PENDIENTE_CONFIRMACION,
+        EstadoReserva.CONFIRMADA,
     }:
         raise ValidationError({"estado": "Esta reserva no admite una nueva solicitud de pago."})
     pagado = importe_pagado(reserva)
@@ -153,7 +158,7 @@ def declarar_comprobante(jugador, codigo: str, pago_id: int, referencia: str, ob
         return pago, False
     if pago.estado not in {EstadoPagoReserva.PENDIENTE_PAGO, EstadoPagoReserva.VENCIDO}:
         raise ValidationError({"estado": "Este pago ya no admite declarar un comprobante."})
-    vencido = fecha_limite(reserva) <= ahora or reserva.estado == EstadoReserva.VENCIDA
+    vencido = (reserva.estado != EstadoReserva.CONFIRMADA and fecha_limite(reserva) <= ahora) or reserva.estado == EstadoReserva.VENCIDA
     if vencido:
         if reserva.estado in ESTADOS_CON_PLAZO:
             _vencer_de_cancha(reserva.cancha_id, ahora)
@@ -161,6 +166,7 @@ def declarar_comprobante(jugador, codigo: str, pago_id: int, referencia: str, ob
         pago.referencia = referencia.strip()
         pago.observacion_jugador = observacion.strip()
         pago.declarado_en = ahora
+        pago.requiere_conciliacion = True
         _registrar_estado(
             pago, EstadoPagoReserva.PAGO_TARDIO, jugador,
             "El jugador declaró un comprobante después de vencer la retención; requiere conciliación manual.",
@@ -170,7 +176,7 @@ def declarar_comprobante(jugador, codigo: str, pago_id: int, referencia: str, ob
         return pago, True
     if pago.estado == EstadoPagoReserva.VENCIDO:
         raise ValidationError({"estado": "El pago ya venció; genera una nueva solicitud si el horario sigue retenido."})
-    if not reserva.revision_pago_extendida:
+    if reserva.estado != EstadoReserva.CONFIRMADA and not reserva.revision_pago_extendida:
         minutos = settings.RESERVA_REVISION_PAGO_MINUTOS
         reserva.revision_pago_vence_en = ahora + timedelta(minutes=minutos)
         reserva.revision_pago_extendida = True
@@ -186,7 +192,8 @@ def declarar_comprobante(jugador, codigo: str, pago_id: int, referencia: str, ob
         "El jugador declaró que adjuntó el comprobante por WhatsApp; no equivale a verificación.",
         {"referencia": pago.referencia},
     )
-    cambiar_estado(reserva, EstadoReserva.PENDIENTE_VERIFICACION, "El jugador declaró un comprobante pendiente de verificación.", jugador)
+    if reserva.estado != EstadoReserva.CONFIRMADA:
+        cambiar_estado(reserva, EstadoReserva.PENDIENTE_VERIFICACION, "El jugador declaró un comprobante pendiente de verificación.", jugador)
     _actualizar_auditoria(jugador, "declarar_comprobante_pago", pago)
     return pago, False
 
@@ -257,17 +264,42 @@ def _vencer_pago_si_corresponde(pago: PagoReserva, ahora) -> bool:
     return False
 
 
+def _confirmar_pago_verificado(usuario, pago: PagoReserva) -> bool:
+    from apps.reservas.services.confirmacion import confirmar_reserva_verificada
+
+    if pago.reserva.estado == EstadoReserva.CONFIRMADA:
+        return True
+    if pago.requiere_conciliacion:
+        return False
+    try:
+        confirmar_reserva_verificada(usuario, pago.reserva_id)
+    except ValidationError:
+        pago.requiere_conciliacion = True
+        pago.save(update_fields=["requiere_conciliacion"])
+        HistorialPagoReserva.objects.create(
+            pago=pago, estado_anterior=pago.estado, estado_nuevo=pago.estado,
+            motivo="Pago verificado sin confirmación segura; requiere conciliación manual.", actor=usuario,
+        )
+        return False
+    return True
+
+
 @transaction.atomic
 def aprobar_pago(usuario, pago_id: int, importe: Decimal | None, motivo: str = "") -> tuple[PagoReserva, bool]:
+    pago_administrable(usuario, pago_id)
     pago = _pago_bloqueado(pago_id)
     if pago.estado == EstadoPagoReserva.APROBADO:
-        return pago, True
-    if pago.estado != EstadoPagoReserva.PENDIENTE_REVISION:
-        raise ValidationError({"estado": "Solo puedes aprobar un comprobante pendiente de revisión."})
-    ahora = timezone.now()
-    if _vencer_pago_si_corresponde(pago, ahora):
-        return pago, False
+        return pago, _confirmar_pago_verificado(usuario, pago)
     reserva = pago.reserva
+    estados_admisibles = {EstadoPagoReserva.PENDIENTE_REVISION}
+    if reserva.estado == EstadoReserva.VENCIDA:
+        estados_admisibles.update({EstadoPagoReserva.VENCIDO, EstadoPagoReserva.PAGO_TARDIO})
+    if pago.estado not in estados_admisibles:
+        raise ValidationError({"estado": "Este comprobante no admite aprobación."})
+    ahora = timezone.now()
+    vencido = _vencer_pago_si_corresponde(pago, ahora)
+    reserva.refresh_from_db()
+    vencido = vencido or reserva.estado == EstadoReserva.VENCIDA
     pagado = importe_pagado(reserva)
     pendiente = reserva.importe_total - pagado
     verificado = importe if importe is not None else pago.importe_solicitado
@@ -281,21 +313,38 @@ def aprobar_pago(usuario, pago_id: int, importe: Decimal | None, motivo: str = "
     pago.revisado_en = ahora
     pago.revisor = usuario
     pago.motivo_revision = motivo.strip()
+    pago.requiere_conciliacion = vencido
     _registrar_estado(
         pago, EstadoPagoReserva.APROBADO, usuario,
         motivo.strip() or "El empleado verificó manualmente el pago recibido.",
         {"importe_verificado": str(verificado)},
     )
-    cambiar_estado(
-        reserva, EstadoReserva.PENDIENTE_CONFIRMACION,
-        "Pago verificado; confirmación, correo y QR corresponden a la Fase 4D.", usuario,
-    )
+    if vencido:
+        HistorialPagoReserva.objects.create(
+            pago=pago, estado_anterior=pago.estado, estado_nuevo=pago.estado,
+            motivo="Pago verificado fuera de plazo; requiere conciliación manual.", actor=usuario,
+        )
+        from apps.reservas.services.notificaciones import encolar_aviso_reserva
+
+        encolar_aviso_reserva(
+            reserva, f"i{pago.pk}", "Pago en revisión · AlToque Pichanga",
+            "Tu pago fue verificado fuera de plazo y requiere conciliación con la sede; el horario no se confirmó.",
+        )
+        _actualizar_auditoria(usuario, "aprobar_pago_tardio", pago, {"importe_verificado": str(verificado)})
+        return pago, False
+    if reserva.estado != EstadoReserva.CONFIRMADA:
+        cambiar_estado(
+            reserva, EstadoReserva.PENDIENTE_CONFIRMACION,
+            "Pago verificado; se comprobará la protección del horario.", usuario,
+        )
+    confirmado = _confirmar_pago_verificado(usuario, pago)
     _actualizar_auditoria(usuario, "aprobar_pago_reserva", pago, {"importe_verificado": str(verificado)})
-    return pago, True
+    return pago, confirmado
 
 
 @transaction.atomic
 def rechazar_pago(usuario, pago_id: int, motivo: str) -> tuple[PagoReserva, bool]:
+    pago_administrable(usuario, pago_id)
     pago = _pago_bloqueado(pago_id)
     if pago.estado == EstadoPagoReserva.RECHAZADO:
         return pago, True
@@ -309,9 +358,16 @@ def rechazar_pago(usuario, pago_id: int, motivo: str) -> tuple[PagoReserva, bool
     pago.revisado_en = ahora
     pago.motivo_revision = motivo.strip()
     _registrar_estado(pago, EstadoPagoReserva.RECHAZADO, usuario, motivo.strip())
-    cambiar_estado(
-        reserva, EstadoReserva.PENDIENTE_PAGO,
-        "El empleado rechazó el comprobante; la reserva conserva el vencimiento original.", usuario,
+    if reserva.estado != EstadoReserva.CONFIRMADA:
+        cambiar_estado(
+            reserva, EstadoReserva.PENDIENTE_PAGO,
+            "El empleado rechazó el comprobante; la reserva conserva el vencimiento original.", usuario,
+        )
+    from apps.reservas.services.notificaciones import encolar_aviso_reserva
+
+    encolar_aviso_reserva(
+        reserva, f"r{pago.pk}", "Comprobante rechazado · AlToque Pichanga",
+        "La sede rechazó el comprobante. Consulta tu reserva para conocer el motivo y las opciones disponibles.",
     )
     _actualizar_auditoria(usuario, "rechazar_pago_reserva", pago, {"motivo": motivo.strip()})
     return pago, True

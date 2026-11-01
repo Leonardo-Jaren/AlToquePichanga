@@ -15,8 +15,8 @@ from apps.horarios.models import (
     IntervaloHorarioSede,
     TipoExcepcionHorario,
 )
-from apps.pagos.models import EstadoPagoReserva, MetodoPagoSede, PagoReserva
-from apps.reservas.models import EstadoReserva, Reserva
+from apps.pagos.models import MetodoPagoSede, PagoReserva
+from apps.reservas.models import Reserva
 from apps.sedes.models import Sede
 from apps.tarifas.models import ReglaTarifa, TipoTarifa
 from apps.usuarios.management.commands import generar_datos_demo as comando
@@ -129,26 +129,10 @@ def test_creacion_idempotente_y_password_local_estable(monkeypatch, tmp_path):
     assert ReglaTarifa.objects.filter(tipo=TipoTarifa.FIN_SEMANA).count() == 6
     assert ReglaTarifa.objects.filter(tipo=TipoTarifa.FERIADO).count() == 2
     assert ReglaTarifa.objects.filter(tipo=TipoTarifa.ESPECIAL).count() == 2
-    reservas = list(Reserva.objects.select_related("cancha__sede").order_by("cancha__sede__empresa_id", "inicio"))
-    assert len(reservas) == 3
-    assert {reserva.estado for reserva in reservas} == {
-        EstadoReserva.PENDIENTE_VERIFICACION,
-        EstadoReserva.PENDIENTE_PAGO,
-        EstadoReserva.VENCIDA,
-    }
-    assert len({reserva.cancha.sede.empresa_id for reserva in reservas}) == 2
-    vencida = next(reserva for reserva in reservas if reserva.estado == EstadoReserva.VENCIDA)
-    assert vencida.bloques.filter(liberado_en__isnull=True).count() == 0
-    assert vencida.historial_estados.count() == 2
+    # El generador no usa transacciones de negocio para poblar horarios.
+    assert Reserva.objects.count() == 0
+    assert PagoReserva.objects.count() == 0
     assert MetodoPagoSede.objects.count() == 12
-    assert set(PagoReserva.objects.values_list("estado", flat=True)) == {
-        EstadoPagoReserva.RECHAZADO,
-        EstadoPagoReserva.APROBADO,
-        EstadoPagoReserva.PENDIENTE_REVISION,
-        EstadoPagoReserva.PENDIENTE_PAGO,
-        EstadoPagoReserva.PAGO_TARDIO,
-    }
-    assert PagoReserva.objects.filter(requiere_conciliacion=True).exists()
     for clave, correo in CORREOS.items():
         usuario = User.objects.get(email=correo)
         assert usuario.is_active
@@ -348,3 +332,19 @@ def test_membresias_y_asignaciones_demo_son_activas(monkeypatch, tmp_path):
             sedes_asignadas__activa=True,
         ).exists()
     assert not MembresiaEmpresa.objects.filter(usuario__email=CORREOS["jugador"]).exists()
+
+
+def test_generador_preserva_reservas_y_pagos_existentes(monkeypatch, tmp_path, settings):
+    from tests.test_fase4c_pagos import _contexto, _solicitar_pago
+
+    settings.PAGOS_RESERVA_HABILITADOS = True
+    contexto = _contexto("persistencia")
+    pago = _solicitar_pago(contexto)
+    assert pago.status_code == 201
+    reserva_antes = Reserva.objects.values().get(pk=contexto["reserva"].pk)
+    pago_antes = PagoReserva.objects.values().get(pk=pago.data["id"])
+    _generar(monkeypatch, tmp_path)
+    assert Reserva.objects.values().get(pk=contexto["reserva"].pk) == reserva_antes
+    assert PagoReserva.objects.values().get(pk=pago.data["id"]) == pago_antes
+    assert Reserva.objects.count() == 1
+    assert PagoReserva.objects.count() == 1

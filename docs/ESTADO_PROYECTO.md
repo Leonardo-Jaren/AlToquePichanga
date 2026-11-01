@@ -271,3 +271,64 @@ El generador local conserva las cuentas y sus contraseñas estables, y añade 12
 ficticios identificados. Las cuentas, referencias y números de demo no se deben usar para
 pagos reales. Ver escenarios reproducibles en `docs/USUARIOS_PRUEBA.md` y resultados exactos
 de las suites en `docs/PLAN_PRUEBAS.md`.
+
+## Fase 4D — avance parcial, no habilitada
+
+Se añadió `confirmar_reserva_verificada` como preparación interna, sin endpoint ni conexión a
+la aprobación de pagos. Exige personal con alcance sobre la cancha, reserva en
+`pendiente_confirmacion`, plazo e inicio vigentes, adelanto aprobado y bloques contiguos y
+no liberados; bloquea cancha y reserva, registra transición y auditoría, y programa el aviso
+WebSocket después del commit. Un reintento de reserva confirmada es idempotente. No se
+reconfirman automáticamente pagos de 4C ni se recuperan bloques liberados.
+
+**Pendiente para completar 4D:** integración transaccional con pagos e incidencias, ticket,
+QR y asistencia, cola persistente de correos, cancelaciones pagadas, vistas, revisión visual,
+pruebas de concurrencia/E2E de la nueva fase y documentación detallada. El servicio aislado
+no constituye un flujo listo para producción. El generador demo no debe crear reservas ni
+pagos conforme a la sección 12 de AGENTS.md. Redis real, SMTP y políticas comerciales siguen
+pendientes de verificación o aprobación.
+
+## Fase 4D — recuperación del generador
+
+La sección 12 de AGENTS.md prohíbe crear reservas o pagos para poblar vistas de horarios.
+La guía y el generador heredados preparaban bloques ocupados de esa manera. El comando ya
+no invoca esas rutinas; conserva cuentas, credenciales, datos existentes y medios ficticios.
+Las reservas necesarias para verificar flujos se crean por las pruebas o por usuarios de
+prueba. La afirmación anterior de que se prohibía toda reserva en pruebas era incorrecta.
+El servicio de confirmación aún no está conectado a la aprobación de pagos; QR, asistencia,
+correos y cancelaciones pagadas siguen pendientes.
+
+## Continuación 4D — implementación y límites
+
+- Al aprobar un pago, `aprobar_pago` valida el alcance, bloquea cancha/reserva/pago y confirma
+  la reserva si el adelanto acumulado y todos los bloques vigentes cumplen las reglas. El
+  servicio también admite revisar individualmente un pago aprobado de 4C. Si la protección
+  falla, conserva la aprobación y la marca para conciliación; no asigna otro horario.
+- Ticket privado: `GET /api/reservas/<codigo>/ticket/` y `ticket/qr/` exigen sesión del
+  jugador dueño y estado confirmado. El QR SVG contiene un código firmado de Django, sin
+  datos personales; la descarga es del QR. La cancelación invalida su uso en el servidor.
+- Ingreso: `POST /api/reservas/administracion/ingreso/consultar/` y `registrar/` reciben
+  `{tipo: "qr"|"codigo", valor}`. Restringen el alcance a sedes autorizadas, exigen reserva
+  confirmada y horario en curso, muestran saldo y registran empleado/fecha una sola vez con
+  bloqueo de fila y relación única. La cámara usa `BarcodeDetector` cuando existe; en otros
+  casos se ingresa el código manualmente. Margen de anticipación: **PENDIENTE**.
+- Cancelación: `POST /api/reservas/<codigo>/cancelacion/` para el jugador y
+  `POST /api/reservas/administracion/<codigo>/cancelar/` para dueño/administrador/superadmin,
+  con motivo. Liberan bloques tras cambiar estado, conservan pagos, marcan revisión para
+  pagos aprobados y publican disponibilidad después del commit. No realizan devoluciones.
+  Solo se permite antes del inicio; la política detallada de plazos sigue **PENDIENTE**.
+- Se reutiliza `CorreoPendiente` y `python manage.py enviar_correos --limite 50`: cada aviso de
+  confirmación/cancelación se registra una sola vez por reserva y tipo dentro de la misma
+  transacción. Programar el comando por separado. El SMTP real y los reintentos operativos no
+  se han validado; como toda cola SMTP, una caída después de la entrega y antes de marcarla
+  puede producir un reenvío. La reserva no depende de la entrega del correo.
+- Las condiciones son configurables por sede y versionadas. Antes de solicitar pago, el
+  jugador acepta la versión vigente y se guarda el texto histórico y la fecha. El contenido
+  definitivo requiere revisión legal; no habilitar pagos de producción. También faltan prueba E2E
+  integral de ingreso en horario real, validación de cámara en dispositivos físicos y Redis
+  real. La Fase 4D permanece parcial; no iniciar la siguiente fase.
+
+Los avisos de rechazo, vencimiento y pago tardío se agregan a la misma cola transaccional; el
+rechazo es único por pago y el vencimiento por reserva. Una cancelación con comprobante ya
+declarado se marca para conciliación aunque todavía no se haya aprobado el pago. Ninguno de
+estos avisos demuestra entrega SMTP real.

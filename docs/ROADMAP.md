@@ -138,3 +138,17 @@ entrega es Fase 4D.
 Google OAuth real, SMTP real y CI remoto son validaciones externas pendientes y no
 se contabilizan como capacidades comprobadas.
 
+
+## Fase 4D — trabajo en curso
+
+Existe un servicio interno de confirmación aislado, todavía sin endpoint ni integración con
+pagos. No marcar la fase completa: faltan ticket/QR, asistencia, cancelaciones, notificaciones,
+incidencias y pruebas integrales. La sección 12 de AGENTS.md prohíbe crear reservas y pagos
+mediante el seeder demo; utilizar datos ficticios creados por pruebas aisladas para la fase.
+
+## Recuperación 4D — situación actual
+
+El generador ya no crea reservas ni pagos para poblar calendarios. La confirmación, ticket QR,
+ingreso, correo en cola, cancelación y aceptación versionada de condiciones tienen
+implementación inicial. Las comprobaciones integrales indicadas en
+`ESTADO_PROYECTO.md` siguen pendientes; 4D no está terminada.

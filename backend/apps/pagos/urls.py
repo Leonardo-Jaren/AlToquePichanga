@@ -9,8 +9,10 @@ from apps.pagos.views import (
     RevisarPagoAdministracionView,
     SolicitudPagoPropiaView,
 )
+from apps.pagos.views_condiciones import CondicionesSedeView
 
 urlpatterns = [
+    path("sedes/<int:sede_id>/condiciones/", CondicionesSedeView.as_view(), name="condiciones-cancelacion-sede"),
     path("sedes/<int:sede_id>/medios/", MediosPagoSedeView.as_view(), name="medios-pago-sede"),
     path("reservas/<str:codigo>/", PagoReservaPropiaView.as_view(), name="pago-reserva-propia"),
     path("reservas/<str:codigo>/solicitudes/", SolicitudPagoPropiaView.as_view(), name="solicitud-pago-reserva"),

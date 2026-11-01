@@ -196,3 +196,29 @@ su autorización antes de implementarse.
 36. **Alcance de la Fase 4C.** La aprobación conserva la reserva en `pendiente_confirmacion`;
     el QR, el correo de confirmación y la transición final pertenecen a Fase 4D. No se habilita
     cancelación pagada ni devolución automática en esta entrega.
+
+## Fase 4D — restricción de datos demo
+
+La sección 12 de AGENTS.md impide que el generador cree reservas, pagos y movimientos de caja.
+El generador heredado de fases previas todavía crea reservas y pagos; corregirlo y adaptar
+Playwright a datos ficticios aislados antes de volver a ejecutar su preparación. No eliminar
+registros existentes automáticamente ni cambiar credenciales. La discrepancia sigue pendiente.
+
+## Corrección del generador demo — 4D
+
+La sección 12 de AGENTS.md prohíbe crear reservas, pagos o movimientos de caja para poblar
+vistas de horarios. La guía y las rutinas heredadas sí prellenaban bloques del calendario.
+El comando ya no invoca esas rutinas; mantiene medios de pago ficticios y conserva sin
+modificar reservas, pagos y contraseñas existentes. Las pruebas de negocio crean sus
+propios datos aislados. La afirmación anterior de prohibición absoluta era demasiado amplia.
+
+## 4D — límites pendientes
+
+- La ventana de ingreso vigente es estrictamente `[inicio, fin)`; anticipación y tolerancias
+  son propuestas **PENDIENTES**, no políticas aprobadas.
+- Revisar y aprobar legalmente las condiciones de cancelación definidas por cada sede antes
+  de producción. El sistema permite versionarlas y registra la aceptación antes del pago.
+- Confirmar la política de cancelación, excepciones y reprogramaciones; no hay devoluciones
+  automáticas. Mantener pagos de producción deshabilitados mientras sigan pendientes.
+- Configurar y verificar SMTP y Redis reales. La cola SMTP puede reenviar si cae el proceso
+  tras la entrega y antes de registrar el resultado; no se promete entrega exactamente una vez.

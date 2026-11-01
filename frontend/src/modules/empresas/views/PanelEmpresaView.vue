@@ -202,7 +202,7 @@ function actualizarEmpresa(datos) {
       <GestionHorariosPanel v-else-if="seccion === 'horarios'" :key="'horarios-' + empresa.id" :sedes="sedesEmpresa" />
       <GestionTarifasPanel v-else-if="seccion === 'tarifas'" :key="'tarifas-' + empresa.id" :sedes="sedesEmpresa" />
       <CalendarioAdminPanel v-else-if="seccion === 'calendario'" :key="'calendario-' + empresa.id" :sedes="sedesEmpresa" />
-      <ReservasAdminPanel v-else-if="seccion === 'reservas'" :key="'reservas-' + empresa.id" :empresa-id="empresa.id" />
+      <ReservasAdminPanel puede-cancelar v-else-if="seccion === 'reservas'" :key="'reservas-' + empresa.id" :empresa-id="empresa.id" />
       <PagosAdminPanel v-else-if="seccion === 'pagos'" :key="'pagos-' + empresa.id" :sedes="sedesEmpresa" :configurar-medios="true" />
       <EquipoPanel v-else-if="seccion === 'equipo'" :key="'equipo-' + empresa.id" :empresa="empresa" :sedes="sedesEmpresa" :suscripcion="resumenSuscripcion?.suscripcion" />
       <SuscripcionPanel v-else-if="seccion === 'suscripcion'" :key="'plan-' + empresa.id" :empresa="empresa" />
