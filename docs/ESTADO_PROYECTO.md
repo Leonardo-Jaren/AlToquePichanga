@@ -2,7 +2,7 @@
 
 Actualizado: 1 de noviembre de 2026 (America/Lima).
 Fases 2, 3A, 3B, 3C, 3D, 4A, 4B, 4C y 4D: **implementadas**. El cierre técnico de 4D, sus resultados y límites están registrados en `docs/PLAN_PRUEBAS.md`.
-Estado de cierre 4D: **validación local completada; Redis real remoto pendiente de CI; cámara física, proveedor SMTP real y seis decisiones comerciales pendientes**.
+Estado de cierre 4D: **validación automatizada completada; falta la comprobación de cámara física, la entrega con SMTP real y la aprobación de seis decisiones comerciales**.
 Siguiente paso: esperar las validaciones externas y aprobaciones indicadas; **no avanzar a Fase 5 ni activar pagos en producción**.
 
 ## Cierre técnico de Fase 4D — 1 de noviembre de 2026
@@ -13,8 +13,9 @@ Siguiente paso: esperar las validaciones externas y aprobaciones indicadas; **no
 - La prueba de fecha controlada solo modifica una reserva demo confirmada en PostgreSQL de
   loopback, con `DEBUG=True` y habilitación explícita; restaura el intervalo original y nunca
   altera el reloj del sistema.
-- Pytest: 155 aprobadas y una omitida por Redis no disponible localmente. Vitest: 127 aprobadas;
-  Playwright: 2 aprobadas. Django check, migraciones, Ruff y build pasaron.
+- Pytest local: 155 aprobadas y una omitida por Redis no disponible en esta máquina. GitHub
+  Actions ejecutó PostgreSQL y Redis real: 156 aprobadas, sin omisiones. Vitest: 127 aprobadas;
+  Playwright: 2 aprobadas. Django check, migraciones, Ruff y build pasaron. [Ejecución de CI](https://github.com/Leonardo-Jaren/AlToquePichanga/actions/runs/41344692313).
 - SMTP se comprobó con un servidor local restringido a destinatarios `@example.test`. La entrega
   externa requiere proveedor y configuración autorizados; no se enviaron correos reales.
 - Se revisaron tickets, modales, asistencia y estados de QR en ambos temas y tamaños. La cámara

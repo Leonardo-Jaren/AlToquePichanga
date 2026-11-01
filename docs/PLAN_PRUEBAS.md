@@ -7,6 +7,7 @@ Actualizado: 1 de noviembre de 2026 (America/Lima).
 | Capa | Resultado |
 |---|---|
 | Backend pytest / PostgreSQL | 155 aprobadas, 1 omitida, 0 fallidas (479,34 s) |
+| GitHub Actions / PostgreSQL + Redis real | Workflow exitoso; 156 aprobadas, 0 omitidas, 0 fallidas (80,79 s) |
 | Frontend Vitest | 127 aprobadas en 20 archivos, 0 fallidas (20,60 s) |
 | Playwright | 2 escenarios aprobados; incluye reserva, QR, acceso cruzado, registro/doble escaneo y QR cancelado (51,4 s) |
 | SMTP de prueba | 1 integración aprobada contra un servidor local que rechaza destinatarios externos |
@@ -16,10 +17,10 @@ Actualizado: 1 de noviembre de 2026 (America/Lima).
 | Vite build | Compilación correcta (2,36 s) |
 
 El único caso omitido localmente es la integración `channels_redis` porque este equipo no tiene
-Docker Desktop/Compose ni un Redis disponible. La configuración reproducible está en
-`compose.redis.dev.yml` y `backend/scripts/validar_redis.ps1`; GitHub Actions también levanta un
-Redis real para ejecutar la integración. El resultado remoto se agregará después de completar
-la ejecución de esta rama. No se reemplazó Redis por InMemory para esa verificación.
+Docker Desktop/Compose ni un Redis disponible. El workflow de la rama levantó Redis OSS
+7.4.12-alpine3.21 y ejecutó esa integración con `ALTOQUE_TEST_REDIS_URL`; la suite remota pasó
+los 156 casos sin omisiones. [Ejecución de GitHub Actions](https://github.com/Leonardo-Jaren/AlToquePichanga/actions/runs/41344692313).
+No se reemplazó Redis por InMemory para esa verificación.
 
 El E2E de asistencia usa una reserva creada por un jugador autenticado y cajeros con sesiones
 reales. Un comando restringido a PostgreSQL de loopback y `DEBUG=True` mueve temporalmente solo

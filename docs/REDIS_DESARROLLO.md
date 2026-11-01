@@ -21,5 +21,5 @@ docker compose -p altoque-pichanga-fase4d -f compose.redis.dev.yml down
 
 La integración de Redis se omite si `ALTOQUE_TEST_REDIS_URL` no está configurada. En esta
 máquina no está disponible Docker Desktop/Compose, por lo que la prueba local no pudo ejecutarse.
-El workflow de GitHub Actions configura un servicio Redis real y la URL explícita para ejecutar
-esa misma prueba; el resultado remoto se documenta cuando termine la ejecución de la rama.
+GitHub Actions sí levantó Redis OSS 7.4.12 y ejecutó la integración con URL explícita; el workflow
+completo terminó con éxito y pytest registró 156 aprobadas, 0 omitidas. [Ejecución de CI](https://github.com/Leonardo-Jaren/AlToquePichanga/actions/runs/41344692313).
