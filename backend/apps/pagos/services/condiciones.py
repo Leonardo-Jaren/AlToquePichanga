@@ -17,7 +17,9 @@ def datos_condicion(condicion):
 
 
 def consultar_condicion(usuario, sede_id: int):
-    get_object_or_404(sedes_visibles(usuario), pk=sede_id)
+    sede = get_object_or_404(sedes_visibles(usuario).select_related("empresa"), pk=sede_id)
+    if usuario.is_superuser:
+        auditar(usuario, "consultar_condiciones_global", "sede", sede.pk, sede.empresa)
     return datos_condicion(condicion_actual(sede_id))
 
 

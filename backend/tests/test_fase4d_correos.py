@@ -83,3 +83,28 @@ def test_rechazo_y_vencimiento_encolan_avisos_sin_duplicados():
     assert vencer_retenciones_vencidas() == 1
     assert vencer_retenciones_vencidas() == 0
     assert NotificacionReserva.objects.filter(reserva=contexto["reserva"], tipo="vencimiento").count() == 1
+
+
+@pytest.mark.django_db
+def test_solicitud_y_cancelacion_de_retencion_encolan_avisos():
+    from django.contrib.auth.models import User
+    from rest_framework.test import APIClient
+
+    from apps.reservas.models import Reserva
+    from tests.test_fase4a_reservas import _contexto as contexto_horarios
+    from tests.test_fase4a_reservas import _solicitar as solicitar_retencion
+
+    jugador = User.objects.create_user(username="aviso-retencion@example.test", email="aviso-retencion@example.test")
+    _, _, _, cancha, dia = contexto_horarios("dueno-aviso@example.test")
+    cliente = APIClient()
+    cliente.force_authenticate(jugador)
+    from uuid import uuid4
+
+    clave = uuid4()
+    respuesta = solicitar_retencion(cliente, cancha, dia, clave=clave)
+    assert respuesta.status_code == 201
+    reserva = Reserva.objects.get(codigo=respuesta.data["codigo"])
+    assert solicitar_retencion(cliente, cancha, dia, clave=clave).status_code == 200
+    assert reserva.notificaciones.filter(tipo="solicitud").count() == 1
+    assert cliente.post(f"/api/reservas/{reserva.codigo}/cancelar/", {}, format="json").status_code == 200
+    assert reserva.notificaciones.filter(tipo="cancelacion").count() == 1

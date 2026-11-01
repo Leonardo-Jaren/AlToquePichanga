@@ -350,3 +350,9 @@ puerto local 6379. No hay transferencias ni envíos reales de correo en estas pr
 - `ruff check .`, `manage.py check`, `makemigrations --check --dry-run` y `npm run build`
   pasaron. La configuración de correo de desarrollo usa locmem salvo que el entorno indique
   explícitamente otro backend. No se verificó entrega SMTP externa.
+
+La suite completa posterior ejecutó 152 casos: 151 aprobados y uno omitido por Redis. Después
+se añadieron los avisos de solicitud/cancelación de retención y la auditoría de lectura global;
+18 pruebas enfocadas de correos, condiciones y reservas pasaron. La suite de cierre se ejecuta
+sobre los 154 casos actuales. La suite frontend más reciente aprobó 126 pruebas, y Playwright
+aprobó dos escenarios; ninguno cubre aún ingreso E2E con una reserva en curso.

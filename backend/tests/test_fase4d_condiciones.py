@@ -43,3 +43,18 @@ def test_cambio_version_y_acceso_entre_empresas():
     respuesta = _solicitar_pago(contexto)
     assert respuesta.status_code == 400
     assert not AceptacionCancelacion.objects.filter(reserva=contexto["reserva"]).exists()
+
+
+@pytest.mark.django_db
+def test_consulta_global_de_condiciones_queda_auditada():
+    from django.contrib.auth.models import User
+
+    from apps.empresas.models import RegistroAuditoria
+
+    contexto = _contexto("condicion-global")
+    superadmin = User.objects.create_superuser(username="global@example.test", email="global@example.test")
+    ruta = f"/api/pagos/sedes/{contexto['sede'].pk}/condiciones/"
+    assert _api(superadmin).get(ruta).status_code == 200
+    assert RegistroAuditoria.objects.filter(
+        actor=superadmin, empresa=contexto["empresa"], accion="consultar_condiciones_global"
+    ).exists()

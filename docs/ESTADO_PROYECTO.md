@@ -332,3 +332,7 @@ Los avisos de rechazo, vencimiento y pago tardío se agregan a la misma cola tra
 rechazo es único por pago y el vencimiento por reserva. Una cancelación con comprobante ya
 declarado se marca para conciliación aunque todavía no se haya aprobado el pago. Ninguno de
 estos avisos demuestra entrega SMTP real.
+
+La creación de una solicitud y la cancelación de una retención también agregan avisos a la
+cola. Las consultas globales de las condiciones de una sede se registran en auditoría. La
+validación de los dos últimos cambios pasó en una ejecución enfocada de 18 pruebas.

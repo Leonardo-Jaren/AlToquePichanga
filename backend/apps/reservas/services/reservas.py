@@ -115,6 +115,12 @@ def _crear_dentro_transaccion(jugador, cancha_id, fecha, hora_inicio, duracion, 
         clave_idempotencia=clave,
     )
     cambiar_estado_inicial(reserva, "El jugador solicitó la retención temporal.", jugador)
+    from apps.reservas.services.notificaciones import encolar_aviso_reserva
+
+    encolar_aviso_reserva(
+        reserva, "solicitud", "Solicitud de reserva · AlToque Pichanga",
+        "Tu horario está retenido temporalmente. La reserva aún no está confirmada y requiere el pago verificado.",
+    )
     _crear_bloques(reserva, cancha, inicio, fin)
     programar_cambio_intervalo(cancha.pk, inicio, fin, "retencion_creada")
     return reserva, True
@@ -160,6 +166,9 @@ def cancelar_retencion(jugador, codigo: str):
     elif reserva.estado == EstadoReserva.RETENIDA:
         cambiar_estado(reserva, EstadoReserva.CANCELADA, "El jugador canceló la retención.", jugador)
         reserva.bloques.filter(liberado_en__isnull=True).update(liberado_en=ahora)
+        from apps.reservas.services.notificaciones import encolar_notificacion_reserva
+
+        encolar_notificacion_reserva(reserva, "cancelacion")
         motivo = "retencion_cancelada"
     else:
         raise ValidationError({"estado": "Solo puedes cancelar una retención que siga vigente."})
