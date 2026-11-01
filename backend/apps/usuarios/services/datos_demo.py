@@ -34,6 +34,7 @@ CORREOS = {
     "dueno_b": "demo-dueno-b@example.test",
     "admin_a": "demo-admin-sede-a@example.test",
     "cajero_a": "demo-cajero-a@example.test",
+    "cajero_a_norte": "demo-cajero-a-norte@example.test",
     "jugador": "demo-jugador@example.test",
     "jugador_b": "demo-jugador-b@example.test",
 }
@@ -44,6 +45,7 @@ USUARIOS = {
     "dueno_b": ("demo_altoque_dueno_b", "Dueño de empresa B", False),
     "admin_a": ("demo_altoque_admin_sede_a", "Administrador de sede A", False),
     "cajero_a": ("demo_altoque_cajero_a", "Cajero de sede A", False),
+    "cajero_a_norte": ("demo_altoque_cajero_a_norte", "Cajero de sede A Norte", False),
     "jugador": ("demo_altoque_jugador", "Jugador sin membresía", False),
     "jugador_b": ("demo_altoque_jugador_b", "Jugador B sin membresía", False),
 }
@@ -319,6 +321,7 @@ def _validar_membresias_esperadas(usuarios: dict, empresas: dict) -> None:
         "dueno_b": (empresas["empresa_b"], RolEmpresa.DUENO),
         "admin_a": (empresas["empresa_a"], RolEmpresa.ADMINISTRADOR_SEDE),
         "cajero_a": (empresas["empresa_a"], RolEmpresa.CAJERO),
+        "cajero_a_norte": (empresas["empresa_a"], RolEmpresa.CAJERO),
         "jugador": None,
         "jugador_b": None,
     }
@@ -362,5 +365,9 @@ def crear_datos_demo(credenciales: dict) -> None:
     cajero = _obtener_membresia(
         usuarios["cajero_a"], empresas["empresa_a"], RolEmpresa.CAJERO
     )
+    cajero_norte = _obtener_membresia(
+        usuarios["cajero_a_norte"], empresas["empresa_a"], RolEmpresa.CAJERO
+    )
     _asignar_sede(admin, sedes["sede_a_centro"])
     _asignar_sede(cajero, sedes["sede_a_centro"])
+    _asignar_sede(cajero_norte, sedes["sede_a_norte"])

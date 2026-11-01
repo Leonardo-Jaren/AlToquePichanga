@@ -1,5 +1,6 @@
 asgiref==3.12.1
 attrs==26.1.0
+aiosmtpd==1.4.6
 autobahn==26.10.1
 Automat==25.4.16
 cbor2==6.1.5

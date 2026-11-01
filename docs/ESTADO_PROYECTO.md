@@ -1,8 +1,27 @@
 # Estado del Proyecto — AlToque Pichanga
 
-Actualizado: 25 de octubre de 2026 (America/Lima).
-Fases 2, 3A, 3B, 3C, 3D, 4A, 4B y 4C: **implementadas**. Los resultados de verificación están registrados en PLAN_PRUEBAS.md.
-Siguiente fase: **Fase 4D — confirmación final, notificación y ticket QR**.
+Actualizado: 1 de noviembre de 2026 (America/Lima).
+Fases 2, 3A, 3B, 3C, 3D, 4A, 4B, 4C y 4D: **implementadas**. El cierre técnico de 4D, sus resultados y límites están registrados en `docs/PLAN_PRUEBAS.md`.
+Estado de cierre 4D: **validación local completada; Redis real remoto pendiente de CI; cámara física, proveedor SMTP real y seis decisiones comerciales pendientes**.
+Siguiente paso: esperar las validaciones externas y aprobaciones indicadas; **no avanzar a Fase 5 ni activar pagos en producción**.
+
+## Cierre técnico de Fase 4D — 1 de noviembre de 2026
+
+- Playwright ejecutó dos escenarios con sesiones reales. El flujo E2E nuevo confirma el pago de
+  prueba, consulta el QR, rechaza otra sede, registra la asistencia una vez, detecta el doble
+  escaneo y rechaza el QR de la reserva cancelada.
+- La prueba de fecha controlada solo modifica una reserva demo confirmada en PostgreSQL de
+  loopback, con `DEBUG=True` y habilitación explícita; restaura el intervalo original y nunca
+  altera el reloj del sistema.
+- Pytest: 155 aprobadas y una omitida por Redis no disponible localmente. Vitest: 127 aprobadas;
+  Playwright: 2 aprobadas. Django check, migraciones, Ruff y build pasaron.
+- SMTP se comprobó con un servidor local restringido a destinatarios `@example.test`. La entrega
+  externa requiere proveedor y configuración autorizados; no se enviaron correos reales.
+- Se revisaron tickets, modales, asistencia y estados de QR en ambos temas y tamaños. La cámara
+  física sigue pendiente por no haber un dispositivo disponible; la guía está en
+  `docs/COMPROBACION_CAMARA.md`.
+- `docs/DECISIONES.md` contiene solo seis decisiones comerciales pendientes. Se publican los
+  cambios en `codex/fase-4d-continuacion`; no se fusiona con `main`.
 
 ## Base conservada
 

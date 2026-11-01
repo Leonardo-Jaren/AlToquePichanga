@@ -35,8 +35,25 @@ async function abrirCalendario(page, fecha) {
   await page.goto('/canchas-publicas')
   await seleccionarCanchaDemo(page)
   await page.getByLabel('Fecha del calendario').fill(fecha)
-  await expect(page.getByTestId('bloque-calendario').filter({ hasText: '19:00–20:00' })).toBeVisible()
+  await expect(page.getByTestId('bloque-calendario').first()).toBeVisible()
   await expect(page.getByText('En vivo')).toBeVisible()
+}
+
+async function buscarHorarioDisponibleEnAmbas(paginaA, paginaB) {
+  const disponiblesA = paginaA.getByTestId('bloque-calendario').filter({
+    has: paginaA.getByRole('button', { name: 'Seleccionar horario' }),
+  })
+  const disponiblesB = paginaB.getByTestId('bloque-calendario').filter({
+    has: paginaB.getByRole('button', { name: 'Seleccionar horario' }),
+  })
+  for (let indice = 0; indice < await disponiblesA.count(); indice += 1) {
+    const texto = await disponiblesA.nth(indice).innerText()
+    const horario = texto.match(/\b\d{2}:\d{2}–\d{2}:\d{2}\b/)?.[0]
+    if (!horario) continue
+    const bloqueB = paginaB.getByTestId('bloque-calendario').filter({ hasText: horario })
+    if (await bloqueB.getByRole('button', { name: 'Seleccionar horario' }).count()) return horario
+  }
+  throw new Error('No hay un bloque disponible en común para ambos jugadores.')
 }
 
 async function seleccionarCanchaDemo(page) {
@@ -56,14 +73,16 @@ test('dos jugadores reciben retención y liberación sin recargar', async ({ bro
   const paginaA = await contextoA.newPage()
   const paginaB = await contextoB.newPage()
   let codigoReserva = ''
+  let horarioReservado = ''
 
   try {
     await ingresar(paginaA, jugadorA)
     await ingresar(paginaB, jugadorB)
     await Promise.all([abrirCalendario(paginaA, fecha), abrirCalendario(paginaB, fecha)])
 
-    const bloqueA = paginaA.getByTestId('bloque-calendario').filter({ hasText: '19:00–20:00' })
-    const bloqueB = paginaB.getByTestId('bloque-calendario').filter({ hasText: '19:00–20:00' })
+    horarioReservado = await buscarHorarioDisponibleEnAmbas(paginaA, paginaB)
+    const bloqueA = paginaA.getByTestId('bloque-calendario').filter({ hasText: horarioReservado })
+    const bloqueB = paginaB.getByTestId('bloque-calendario').filter({ hasText: horarioReservado })
     await expect(bloqueA.getByRole('button', { name: 'Seleccionar horario' })).toBeEnabled()
     await expect(bloqueB.getByRole('button', { name: 'Seleccionar horario' })).toBeEnabled()
 
@@ -94,13 +113,13 @@ test('dos jugadores reciben retención y liberación sin recargar', async ({ bro
     await paginaB.goto('/canchas-publicas')
     await seleccionarCanchaDemo(paginaB)
     await paginaB.getByLabel('Fecha del calendario').fill(fecha)
-    const bloqueLiberado = paginaB.getByTestId('bloque-calendario').filter({ hasText: '19:00–20:00' })
+    const bloqueLiberado = paginaB.getByTestId('bloque-calendario').filter({ hasText: horarioReservado })
     await expect(bloqueLiberado.getByRole('button', { name: 'Seleccionar horario' })).toBeEnabled({ timeout: 10000 })
   } finally {
     await paginaA.goto('/mis-reservas').catch(() => {})
     const filas = codigoReserva
       ? paginaA.getByRole('row').filter({ hasText: codigoReserva })
-      : paginaA.getByRole('row').filter({ hasText: 'Cancha A heredada' }).filter({ hasText: '19:00–20:00' })
+      : paginaA.getByRole('row').filter({ hasText: 'Cancha A heredada' }).filter({ hasText: horarioReservado })
     const cantidad = await filas.count().catch(() => 0)
     for (let indice = 0; indice < cantidad; indice += 1) {
       const fila = filas.nth(indice)

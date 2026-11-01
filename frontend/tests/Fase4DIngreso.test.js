@@ -28,6 +28,20 @@ describe('Validación de ingreso', () => {
     expect(wrapper.text()).toContain('Ingresa el código de reserva')
   })
 
+  it('explica cómo continuar cuando se deniega el permiso de cámara', async () => {
+    vi.stubGlobal('BarcodeDetector', class {})
+    Object.defineProperty(window, 'isSecureContext', { configurable: true, value: true })
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: { getUserMedia: vi.fn().mockRejectedValue(Object.assign(new Error('permiso'), { name: 'NotAllowedError' })) },
+    })
+    const wrapper = mount(ValidarIngreso)
+    await wrapper.findAll('button').find((b) => b.text().includes('Abrir cámara')).trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Permite el acceso a la cámara en el navegador')
+    expect(wrapper.text()).toContain('ingresa el código de reserva')
+  })
+
   it('informa cuando el QR o código no se puede validar', async () => {
     vi.spyOn(reservasApi, 'consultarIngreso').mockRejectedValue(new Error('inválido'))
     const wrapper = mount(ValidarIngreso)

@@ -2,7 +2,7 @@
 
 > Actualización 4D: el generador prepara únicamente datos maestros y medios ficticios. Ya no crea reservas ni pagos; los ejemplos antiguos de bloques prellenados descritos abajo son históricos. Crea una reserva manual para recorrer pagos. Los registros existentes no se borran.
 
-Este fixture sirve para recorrer horarios, tarifas, calendario, retenciones y disponibilidad en tiempo real con siete cuentas ficticias locales. Todas las cuentas usan el inicio de sesión normal de la aplicación (`/ingresar`, correo y contraseña); el comando no agrega rutas especiales ni omite permisos. La consulta pública está disponible en `/canchas-publicas` y no necesita sesión; solicitar o consultar reservas sí requiere iniciar sesión.
+Este fixture sirve para recorrer horarios, tarifas, calendario, retenciones y disponibilidad en tiempo real con ocho cuentas ficticias locales. Todas las cuentas usan el inicio de sesión normal de la aplicación (`/ingresar`, correo y contraseña); el comando no agrega rutas especiales ni omite permisos. La consulta pública está disponible en `/canchas-publicas` y no necesita sesión; solicitar o consultar reservas sí requiere iniciar sesión.
 
 ## Crear los datos
 
@@ -27,6 +27,7 @@ El comando solo funciona con `DEBUG=True`, PostgreSQL y `localhost`, `127.0.0.1`
 | `demo-dueno-b@example.test` | Dueño de empresa B | Ambas sedes de la empresa B; sin acceso a A. |
 | `demo-admin-sede-a@example.test` | Administrador de sede | Solo la sede A Centro asignada. |
 | `demo-cajero-a@example.test` | Cajero | Lectura en A Centro; no puede modificar horarios. |
+| `demo-cajero-a-norte@example.test` | Cajero | Solo A Norte; cuenta separada para verificar el aislamiento entre sedes. |
 | `demo-jugador@example.test` | Jugador | Sin membresías de empresa. |
 | `demo-jugador-b@example.test` | Jugador | Sin membresías de empresa; cuenta independiente para probar sesiones simultáneas. |
 
@@ -242,3 +243,14 @@ El cajero consulta **Reservas → Validar ingreso**, escanea en navegadores comp
 escribe el código. El servidor solo admite el horario en curso, sin margen anticipado aprobado.
 El jugador abre **Mis reservas → Ver ticket** o **Ver detalle → Cancelar reserva**. Las
 cancelaciones con pagos quedan para revisión y nunca ejecutan devoluciones automáticamente.
+
+La E2E de Fase 4D inicia sesión normal como jugador, cajero de A Centro y cajero de A Norte.
+El proceso `preparar_asistencia_e2e` desplaza temporalmente solo el intervalo de una reserva
+demo confirmada para que la asistencia ocurra en curso; usa `DEBUG=True`, PostgreSQL de
+loopback y `ALTOQUE_PERMITIR_E2E_ASISTENCIA=1`. La prueba restaura el intervalo original antes
+de cancelar la reserva. No cambia el reloj del sistema ni el reloj global de la aplicación.
+El registro de asistencia y la reserva cancelada quedan como resultados locales de prueba.
+
+La prueba física de cámara requiere HTTPS y un dispositivo con permisos habilitados. Pasos,
+errores esperados y compatibilidad están en `docs/COMPROBACION_CAMARA.md`; Playwright simula
+la lectura y no sustituye esa verificación.

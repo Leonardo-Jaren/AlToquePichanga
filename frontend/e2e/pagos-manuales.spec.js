@@ -1,17 +1,78 @@
 import { mkdirSync, readFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, test } from '@playwright/test'
 
 const localGuide = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../docs/USUARIOS_PRUEBA_LOCAL.md')
 const screenshots = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../test-results')
+const frontendDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+const backendDir = path.resolve(frontendDir, '../backend')
+const pythonPath = process.env.ALTOQUE_PYTHON || (process.platform === 'win32'
+  ? path.join(backendDir, 'venv', 'Scripts', 'python.exe')
+  : path.join(backendDir, 'venv', 'bin', 'python'))
 
 function leerCuentas() {
   const contenido = readFileSync(localGuide, 'utf8')
   const bloque = contenido.match(/```json\n([\s\S]*?)\n```/)
   if (!bloque) throw new Error('El seeder no dejó un archivo local de credenciales válido.')
   const usuarios = JSON.parse(bloque[1]).usuarios
-  return { jugador: usuarios.jugador, cajero: usuarios.cajero_a }
+  return {
+    jugador: usuarios.jugador,
+    cajero: usuarios.cajero_a,
+    cajeroNorte: usuarios.cajero_a_norte,
+  }
+}
+
+function prepararHorarioEnCurso(codigo) {
+  const resultado = spawnSync(pythonPath, [
+    'manage.py', 'preparar_asistencia_e2e', '--codigo', codigo,
+  ], {
+    cwd: backendDir,
+    env: { ...process.env, DEBUG: 'True', ALTOQUE_PERMITIR_E2E_ASISTENCIA: '1' },
+    encoding: 'utf8',
+  })
+  if (resultado.error || resultado.status !== 0) {
+    throw new Error(`No se pudo controlar el horario de la reserva demo. ${resultado.stderr || ''}`)
+  }
+  return JSON.parse(resultado.stdout.trim())
+}
+
+function restaurarHorario(codigo, horario) {
+  const resultado = spawnSync(pythonPath, [
+    'manage.py', 'preparar_asistencia_e2e', '--codigo', codigo, '--restaurar',
+    '--inicio-original', horario.inicio_original,
+    '--fin-original', horario.fin_original,
+    '--inicio-controlado', horario.inicio_controlado,
+    '--fin-controlado', horario.fin_controlado,
+  ], {
+    cwd: backendDir,
+    env: { ...process.env, DEBUG: 'True', ALTOQUE_PERMITIR_E2E_ASISTENCIA: '1' },
+    encoding: 'utf8',
+  })
+  if (resultado.error || resultado.status !== 0) {
+    throw new Error(`No se pudo restaurar el horario de la reserva demo. ${resultado.stderr || ''}`)
+  }
+}
+
+async function prepararEscanerQr(page, token) {
+  await page.evaluate((valor) => {
+    Object.defineProperty(window, 'BarcodeDetector', { configurable: true, value: class {
+      async detect() { return [{ rawValue: valor }] }
+    } })
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: { getUserMedia: async () => new MediaStream() },
+    })
+    HTMLMediaElement.prototype.play = async () => {}
+  }, token)
+}
+
+async function capturarAccionModal(dialogo, accion, nombreArchivo) {
+  await dialogo.evaluate((elemento) => { elemento.scrollTop = elemento.scrollHeight })
+  await expect(accion).toBeInViewport()
+  await dialogo.screenshot({ path: path.join(screenshots, nombreArchivo) })
+  await dialogo.evaluate((elemento) => { elemento.scrollTop = 0 })
 }
 
 function lunesDesde(fecha, semanas) {
@@ -59,17 +120,22 @@ async function seleccionarHorarioLibre(page) {
   throw new Error('No se encontró un horario libre en las próximas diez semanas para la prueba.')
 }
 
-test('jugador declara un adelanto y cajero lo verifica manualmente', async ({ browser }) => {
-  const { jugador, cajero } = leerCuentas()
+test('jugador confirma, consulta el QR y cajero registra el ingreso una sola vez', async ({ browser }) => {
+  const { jugador, cajero, cajeroNorte } = leerCuentas()
   const contextoJugador = await browser.newContext({
     colorScheme: 'light', viewport: { width: 390, height: 844 },
   })
   const contextoCajero = await browser.newContext({
     colorScheme: 'dark', viewport: { width: 1440, height: 1000 },
   })
+  const contextoCajeroNorte = await browser.newContext({
+    colorScheme: 'light', viewport: { width: 1440, height: 1000 },
+  })
   const jugadorPage = await contextoJugador.newPage()
   const cajeroPage = await contextoCajero.newPage()
+  const cajeroNortePage = await contextoCajeroNorte.newPage()
   let codigoReserva = ''
+  let horarioControlado = null
 
   try {
     await ingresar(jugadorPage, jugador, '/panel/jugador')
@@ -126,13 +192,27 @@ test('jugador declara un adelanto y cajero lo verifica manualmente', async ({ br
     await expect(revision.getByText('El personal debe comprobar el movimiento en su cuenta.')).toBeVisible()
     const importe = await revision.locator('input[type="number"]').inputValue()
     await revision.locator('input[type="number"]').fill(importe)
-    await revision.screenshot({ path: path.join(screenshots, 'pagos-cajero-modal-oscuro.png') })
+    const botonAprobar = revision.getByRole('button', { name: 'Aprobar pago' })
+    await revision.screenshot({ path: path.join(screenshots, '4d-pago-modal-escritorio-oscuro.png') })
+    await capturarAccionModal(revision, botonAprobar, '4d-pago-modal-final-escritorio-oscuro.png')
+    await cajeroPage.evaluate(() => { document.documentElement.dataset.theme = 'light' })
+    await revision.screenshot({ path: path.join(screenshots, '4d-pago-modal-escritorio-claro.png') })
+    await capturarAccionModal(revision, botonAprobar, '4d-pago-modal-final-escritorio-claro.png')
+    await cajeroPage.setViewportSize({ width: 390, height: 844 })
+    await cajeroPage.evaluate(() => { document.documentElement.dataset.theme = 'dark' })
+    await revision.screenshot({ path: path.join(screenshots, '4d-pago-modal-movil-oscuro.png') })
+    await capturarAccionModal(revision, botonAprobar, '4d-pago-modal-final-movil-oscuro.png')
+    await cajeroPage.evaluate(() => { document.documentElement.dataset.theme = 'light' })
+    await revision.screenshot({ path: path.join(screenshots, '4d-pago-modal-movil-claro.png') })
+    await capturarAccionModal(revision, botonAprobar, '4d-pago-modal-final-movil-claro.png')
+    await cajeroPage.setViewportSize({ width: 1440, height: 1000 })
+    await cajeroPage.evaluate(() => { document.documentElement.dataset.theme = 'dark' })
 
     const aprobacion = cajeroPage.waitForResponse((respuestaPago) => (
       respuestaPago.request().method() === 'POST'
       && new URL(respuestaPago.url()).pathname.endsWith('/aprobar/')
     ))
-    await revision.getByRole('button', { name: 'Aprobar pago' }).click()
+    await botonAprobar.click()
     expect((await aprobacion).status()).toBe(200)
     await expect(cajeroPage.getByRole('status').filter({ hasText: 'La reserva está confirmada' })).toBeVisible()
     await expect(revision.getByText('Pago revisado', { exact: true })).toBeVisible()
@@ -142,7 +222,10 @@ test('jugador declara un adelanto y cajero lo verifica manualmente', async ({ br
     const ingreso = cajeroPage.getByRole('region', { name: 'Validar ingreso' })
     await expect(ingreso).toBeVisible()
     await ingreso.screenshot({ path: path.join(screenshots, '4d-ingreso-escritorio-oscuro.png') })
+    await cajeroPage.evaluate(() => { document.documentElement.dataset.theme = 'light' })
+    await ingreso.screenshot({ path: path.join(screenshots, '4d-ingreso-escritorio-claro.png') })
     await cajeroPage.setViewportSize({ width: 390, height: 844 })
+    await cajeroPage.evaluate(() => { document.documentElement.dataset.theme = 'dark' })
     await ingreso.screenshot({ path: path.join(screenshots, '4d-ingreso-movil-oscuro.png'), animations: 'disabled' })
     await cajeroPage.evaluate(() => { document.documentElement.dataset.theme = 'light' })
     await ingreso.screenshot({ path: path.join(screenshots, '4d-ingreso-movil-claro.png') })
@@ -152,22 +235,93 @@ test('jugador declara un adelanto y cajero lo verifica manualmente', async ({ br
     await expect(filaReserva).toBeVisible()
     await filaReserva.getByRole('button', { name: 'Ver ticket' }).click()
     const ticket = jugadorPage.getByRole('dialog')
+    const descargaQr = ticket.getByRole('link', { name: 'Descargar QR' })
     await expect(ticket.getByAltText('Código QR de la reserva confirmada')).toBeVisible()
-    await expect(ticket.getByRole('link', { name: 'Descargar QR' })).toBeVisible()
+    await expect(descargaQr).toBeVisible()
     await ticket.screenshot({ path: path.join(screenshots, '4d-ticket-movil-claro.png') })
+    await capturarAccionModal(ticket, descargaQr, '4d-ticket-final-movil-claro.png')
     await jugadorPage.evaluate(() => { document.documentElement.dataset.theme = 'dark' })
     await ticket.screenshot({ path: path.join(screenshots, '4d-ticket-movil-oscuro.png'), animations: 'disabled' })
+    await capturarAccionModal(ticket, descargaQr, '4d-ticket-final-movil-oscuro.png')
     await jugadorPage.setViewportSize({ width: 1440, height: 1000 })
     await ticket.screenshot({ path: path.join(screenshots, '4d-ticket-escritorio-oscuro.png') })
+    await capturarAccionModal(ticket, descargaQr, '4d-ticket-final-escritorio-oscuro.png')
     await jugadorPage.evaluate(() => { document.documentElement.dataset.theme = 'light' })
     await ticket.screenshot({ path: path.join(screenshots, '4d-ticket-escritorio-claro.png') })
+    await capturarAccionModal(ticket, descargaQr, '4d-ticket-final-escritorio-claro.png')
     await ticket.getByRole('button', { name: 'Cerrar', exact: true }).click()
+
+    horarioControlado = prepararHorarioEnCurso(codigoReserva)
+    const qr = horarioControlado.token_qr
+    await ingresar(cajeroNortePage, cajeroNorte, '/panel/cajero')
+    await cajeroNortePage.getByRole('button', { name: 'Reservas', exact: true }).click()
+    const ingresoNorte = cajeroNortePage.getByRole('region', { name: 'Validar ingreso' })
+    await prepararEscanerQr(cajeroNortePage, qr)
+    const consultaAjena = cajeroNortePage.waitForResponse((respuestaIngreso) => (
+      respuestaIngreso.request().method() === 'POST'
+      && new URL(respuestaIngreso.url()).pathname === '/api/reservas/administracion/ingreso/consultar/'
+    ))
+    await ingresoNorte.getByRole('button', { name: 'Abrir cámara' }).click()
+    expect((await consultaAjena).status()).toBe(404)
+    await expect(ingresoNorte.getByText('No se pudo validar la reserva. Revisa el código, la sede y el horario.')).toBeVisible()
+
+    await prepararEscanerQr(cajeroPage, qr)
+    const consulta = cajeroPage.waitForResponse((respuestaIngreso) => (
+      respuestaIngreso.request().method() === 'POST'
+      && new URL(respuestaIngreso.url()).pathname === '/api/reservas/administracion/ingreso/consultar/'
+    ))
+    await ingreso.getByRole('button', { name: 'Abrir cámara' }).click()
+    expect((await consulta).status()).toBe(200)
+    await expect(ingreso.getByText('[DEMO ALTOQUE] Sede A Centro · [DEMO ALTOQUE] Cancha A heredada')).toBeVisible()
+    await ingreso.screenshot({ path: path.join(screenshots, '4d-ingreso-qr-escritorio-oscuro.png') })
+    await cajeroPage.evaluate(() => { document.documentElement.dataset.theme = 'light' })
+    await ingreso.screenshot({ path: path.join(screenshots, '4d-ingreso-qr-escritorio-claro.png') })
+    await cajeroPage.setViewportSize({ width: 390, height: 844 })
+    await cajeroPage.evaluate(() => { document.documentElement.dataset.theme = 'dark' })
+    await ingreso.screenshot({ path: path.join(screenshots, '4d-ingreso-qr-movil-oscuro.png') })
+    await cajeroPage.evaluate(() => { document.documentElement.dataset.theme = 'light' })
+    await ingreso.screenshot({ path: path.join(screenshots, '4d-ingreso-qr-movil-claro.png') })
+    await cajeroPage.setViewportSize({ width: 1440, height: 1000 })
+    await cajeroPage.evaluate(() => { document.documentElement.dataset.theme = 'dark' })
+    const registro = cajeroPage.waitForResponse((respuestaIngreso) => (
+      respuestaIngreso.request().method() === 'POST'
+      && new URL(respuestaIngreso.url()).pathname === '/api/reservas/administracion/ingreso/registrar/'
+    ))
+    await ingreso.getByRole('button', { name: 'Registrar ingreso' }).click()
+    expect((await registro).status()).toBe(201)
+    await expect(ingreso.getByText('Ingreso registrado.')).toBeVisible()
+
+    const segundoEscaneo = cajeroPage.waitForResponse((respuestaIngreso) => (
+      respuestaIngreso.request().method() === 'POST'
+      && new URL(respuestaIngreso.url()).pathname === '/api/reservas/administracion/ingreso/consultar/'
+    ))
+    await ingreso.getByRole('button', { name: 'Abrir cámara' }).click()
+    expect((await segundoEscaneo).status()).toBe(200)
+    await expect(ingreso.getByText('Ingreso ya registrado', { exact: true })).toBeVisible()
+    await expect(ingreso.getByRole('button', { name: 'Registrar ingreso' })).toHaveCount(0)
+    await ingreso.screenshot({ path: path.join(screenshots, '4d-ingreso-doble-escritorio-oscuro.png') })
+    await cajeroPage.evaluate(() => { document.documentElement.dataset.theme = 'light' })
+    await ingreso.screenshot({ path: path.join(screenshots, '4d-ingreso-doble-escritorio-claro.png') })
+    await cajeroPage.setViewportSize({ width: 390, height: 844 })
+    await cajeroPage.evaluate(() => { document.documentElement.dataset.theme = 'dark' })
+    await ingreso.screenshot({ path: path.join(screenshots, '4d-ingreso-doble-movil-oscuro.png') })
+    await cajeroPage.evaluate(() => { document.documentElement.dataset.theme = 'light' })
+    await ingreso.screenshot({ path: path.join(screenshots, '4d-ingreso-doble-movil-claro.png') })
+    await cajeroPage.setViewportSize({ width: 1440, height: 1000 })
+    await cajeroPage.evaluate(() => { document.documentElement.dataset.theme = 'dark' })
+
+    restaurarHorario(codigoReserva, horarioControlado)
+    horarioControlado = null
     await filaReserva.getByRole('button', { name: 'Ver detalle' }).click()
     await jugadorPage.getByRole('dialog').getByRole('button', { name: 'Cancelar reserva' }).click()
     const cancelar = jugadorPage.getByRole('dialog')
     await expect(cancelar.getByText('Las cancelaciones voluntarias normalmente no generan devolución del adelanto. Las excepciones y los derechos aplicables pueden requerir revisión de la sede.', { exact: true })).toBeVisible()
     await cancelar.screenshot({ path: path.join(screenshots, '4d-cancelacion-escritorio-claro.png') })
+    await jugadorPage.evaluate(() => { document.documentElement.dataset.theme = 'dark' })
+    await cancelar.screenshot({ path: path.join(screenshots, '4d-cancelacion-escritorio-oscuro.png') })
     await jugadorPage.setViewportSize({ width: 390, height: 844 })
+    await jugadorPage.evaluate(() => { document.documentElement.dataset.theme = 'light' })
+    await cancelar.screenshot({ path: path.join(screenshots, '4d-cancelacion-movil-claro.png') })
     await jugadorPage.evaluate(() => { document.documentElement.dataset.theme = 'dark' })
     await cancelar.screenshot({ path: path.join(screenshots, '4d-cancelacion-movil-oscuro.png') })
     await cancelar.getByLabel('Motivo de cancelación').fill('Prueba local de cancelación')
@@ -175,8 +329,27 @@ test('jugador declara un adelanto y cajero lo verifica manualmente', async ({ br
     await expect(jugadorPage.getByRole('status').filter({ hasText: 'Reserva cancelada' })).toBeVisible()
     await expect(filaReserva.getByText('Cancelada')).toBeVisible()
 
+    await prepararEscanerQr(cajeroPage, qr)
+    const qrCancelado = cajeroPage.waitForResponse((respuestaIngreso) => (
+      respuestaIngreso.request().method() === 'POST'
+      && new URL(respuestaIngreso.url()).pathname === '/api/reservas/administracion/ingreso/consultar/'
+    ))
+    await ingreso.getByRole('button', { name: 'Abrir cámara' }).click()
+    expect((await qrCancelado).status()).toBe(400)
+    await expect(ingreso.getByText('No se pudo validar la reserva. Revisa el código, la sede y el horario.')).toBeVisible()
+    await ingreso.screenshot({ path: path.join(screenshots, '4d-qr-cancelado-escritorio-oscuro.png') })
+    await cajeroPage.evaluate(() => { document.documentElement.dataset.theme = 'light' })
+    await ingreso.screenshot({ path: path.join(screenshots, '4d-qr-cancelado-escritorio-claro.png') })
+    await cajeroPage.setViewportSize({ width: 390, height: 844 })
+    await cajeroPage.evaluate(() => { document.documentElement.dataset.theme = 'dark' })
+    await ingreso.screenshot({ path: path.join(screenshots, '4d-qr-cancelado-movil-oscuro.png') })
+    await cajeroPage.evaluate(() => { document.documentElement.dataset.theme = 'light' })
+    await ingreso.screenshot({ path: path.join(screenshots, '4d-qr-cancelado-movil-claro.png') })
+
   } finally {
+    if (horarioControlado) restaurarHorario(codigoReserva, horarioControlado)
     await contextoJugador.close()
     await contextoCajero.close()
+    await contextoCajeroNorte.close()
   }
 })

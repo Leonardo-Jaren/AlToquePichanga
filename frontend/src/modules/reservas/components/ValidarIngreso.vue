@@ -26,17 +26,41 @@ function detenerCamara() {
 }
 onBeforeUnmount(() => { desmontado = true; detenerCamara() })
 
+function errorCamara(error) {
+  const mensajes = {
+    NotAllowedError: 'Permite el acceso a la cámara en el navegador o ingresa el código de reserva.',
+    NotFoundError: 'No encontramos una cámara disponible. Ingresa el código de reserva.',
+    NotReadableError: 'La cámara está ocupada por otra aplicación. Ciérrala e inténtalo otra vez.',
+    OverconstrainedError: 'No se pudo usar esa cámara. Cambia de cámara o ingresa el código.',
+    SecurityError: 'La cámara requiere una conexión HTTPS o localhost. Ingresa el código de reserva.',
+    NotSupportedError: 'Este navegador no puede leer códigos QR. Ingresa el código de reserva.',
+  }
+  return mensajes[error?.name] || 'No se pudo abrir o leer la cámara. Ingresa el código de reserva.'
+}
+
 async function iniciarCamara() {
   if (iniciando) return
   mensaje.value = ''
+  if (!window.isSecureContext) {
+    mensaje.value = errorCamara({ name: 'SecurityError' })
+    return
+  }
   if (!globalThis.BarcodeDetector || !navigator.mediaDevices?.getUserMedia) {
     mensaje.value = 'La cámara no está disponible en este navegador. Ingresa el código de reserva.'
     return
   }
   iniciando = true
   try {
-    const detector = new globalThis.BarcodeDetector({ formats: ['qr_code'] })
-    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+    const Detector = globalThis.BarcodeDetector
+    const formatos = await Detector.getSupportedFormats?.()
+    if (formatos && !formatos.includes('qr_code')) {
+      mensaje.value = errorCamara({ name: 'NotSupportedError' })
+      return
+    }
+    const detector = new Detector({ formats: ['qr_code'] })
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' } }, audio: false,
+    })
     if (desmontado) { detenerCamara(); return }
     camaraActiva.value = true
     await new Promise((resolve) => requestAnimationFrame(resolve))
@@ -54,13 +78,17 @@ async function iniciarCamara() {
           await consultar()
           return
         }
-      } catch { /* La cámara aún puede estar enfocando. */ }
+      } catch (error) {
+        detenerCamara()
+        if (!desmontado) mensaje.value = errorCamara(error)
+        return
+      }
       if (camaraActiva.value) temporizador = setTimeout(escanear, 350)
     }
     await escanear()
-  } catch {
+  } catch (error) {
     detenerCamara()
-    if (!desmontado) mensaje.value = 'No se pudo abrir la cámara. Ingresa el código de reserva.'
+    if (!desmontado) mensaje.value = errorCamara(error)
   } finally { iniciando = false }
 }
 
@@ -86,7 +114,7 @@ async function registrar() {
     } else mensaje.value = 'No se pudo registrar el ingreso. Inténtalo de nuevo.'
   } finally { cargando.value = false }
 }
-function editarCodigo() { tipo.value = 'codigo'; resultado.value = null }
+function editarCodigo() { tipo.value = 'codigo'; resultado.value = null; mensaje.value = '' }
 </script>
 
 <template>

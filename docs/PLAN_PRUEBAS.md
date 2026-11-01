@@ -1,6 +1,41 @@
-# Plan y resultados de pruebas — Fases 0, 1, 2, 3A–3D y 4A
+# Plan y resultados de pruebas — Fases 0–4D
 
-Actualizado: 24 de octubre de 2026 (America/Lima).
+Actualizado: 1 de noviembre de 2026 (America/Lima).
+
+## Cierre técnico de Fase 4D — ejecución local
+
+| Capa | Resultado |
+|---|---|
+| Backend pytest / PostgreSQL | 155 aprobadas, 1 omitida, 0 fallidas (479,34 s) |
+| Frontend Vitest | 127 aprobadas en 20 archivos, 0 fallidas (20,60 s) |
+| Playwright | 2 escenarios aprobados; incluye reserva, QR, acceso cruzado, registro/doble escaneo y QR cancelado (51,4 s) |
+| SMTP de prueba | 1 integración aprobada contra un servidor local que rechaza destinatarios externos |
+| Django check | Sin incidencias |
+| makemigrations --check --dry-run | Sin cambios pendientes |
+| Ruff | Sin errores |
+| Vite build | Compilación correcta (2,36 s) |
+
+El único caso omitido localmente es la integración `channels_redis` porque este equipo no tiene
+Docker Desktop/Compose ni un Redis disponible. La configuración reproducible está en
+`compose.redis.dev.yml` y `backend/scripts/validar_redis.ps1`; GitHub Actions también levanta un
+Redis real para ejecutar la integración. El resultado remoto se agregará después de completar
+la ejecución de esta rama. No se reemplazó Redis por InMemory para esa verificación.
+
+El E2E de asistencia usa una reserva creada por un jugador autenticado y cajeros con sesiones
+reales. Un comando restringido a PostgreSQL de loopback y `DEBUG=True` mueve temporalmente solo
+esa reserva a un intervalo en curso; el `finally` restaura fecha y hora sin tocar el reloj global.
+El escenario confirma QR, deniega acceso desde otra sede, registra una sola entrada, comprueba
+el segundo escaneo y rechaza el QR después de cancelar.
+
+La revisión visual cubrió ticket y diálogo de revisión de pago, cancelación, validación de
+ingreso y estados de QR en móvil/escritorio y claro/oscuro, con capturas generadas en
+`frontend/test-results` (ignoradas por Git). No se detectaron defectos visuales que justificaran
+cambios cosméticos. La compatibilidad con cámara física queda **PENDIENTE**; se dejó una guía en
+`docs/COMPROBACION_CAMARA.md`. SMTP local validó la cola; la entrega con proveedor real requiere
+configuración y autorización aparte según `docs/COMPROBACION_SMTP.md`.
+
+Las seis decisiones comerciales siguen **PENDIENTES** en `docs/DECISIONES.md`. No se avanzó a
+Fase 5 ni se habilitaron pagos en producción.
 
 ## Verificación histórica completa — Fase 3A
 

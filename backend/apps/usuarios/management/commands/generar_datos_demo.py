@@ -89,7 +89,8 @@ cancha `[DEMO ALTOQUE] Cancha A heredada` y `[DEMO ALTOQUE] Cancha B Centro 1` q
 publicadas localmente por el seeder. La selección no crea reservas ni bloquea horarios.
 """
 _ROLES = tuple(CORREOS)
-_ROLES_ANTERIORES = tuple(rol for rol in _ROLES if rol != "jugador_b")
+_ROLES_ANTERIORES = tuple(rol for rol in _ROLES if rol != "cajero_a_norte")
+_ROLES_INICIALES = tuple(rol for rol in _ROLES if rol not in {"jugador_b", "cajero_a_norte"})
 _GUIA_LOCAL_ANTERIOR_FASE4A = """
 ## Comprobaciones manuales de Fase 4A
 
@@ -170,7 +171,7 @@ def _validar_estructura(credenciales: object) -> dict:
     if credenciales["version"] != 1 or not isinstance(credenciales["usuarios"], dict):
         raise CommandError("El archivo local de credenciales no tiene una versión compatible.")
     roles = set(credenciales["usuarios"])
-    if roles not in (set(_ROLES), set(_ROLES_ANTERIORES)):
+    if roles not in (set(_ROLES), set(_ROLES_ANTERIORES), set(_ROLES_INICIALES)):
         raise CommandError("El archivo local de credenciales contiene cuentas inesperadas.")
     for rol in roles:
         entrada = credenciales["usuarios"][rol]
@@ -181,16 +182,21 @@ def _validar_estructura(credenciales: object) -> dict:
         password = entrada["contrasena"]
         if not isinstance(password, str) or not re.fullmatch(r"[A-Za-z0-9_-]{40,}", password):
             raise CommandError("El archivo local de credenciales contiene una contraseña inválida.")
+    adicionales = {}
     if roles == set(_ROLES_ANTERIORES):
+        adicionales["cajero_a_norte"] = {
+            "correo": CORREOS["cajero_a_norte"],
+            "contrasena": secrets.token_urlsafe(48),
+        }
+    elif roles == set(_ROLES_INICIALES):
+        adicionales = {
+            rol: {"correo": CORREOS[rol], "contrasena": secrets.token_urlsafe(48)}
+            for rol in ("jugador_b", "cajero_a_norte")
+        }
+    if adicionales:
         credenciales = {
             **credenciales,
-            "usuarios": {
-                **credenciales["usuarios"],
-                "jugador_b": {
-                    "correo": CORREOS["jugador_b"],
-                    "contrasena": secrets.token_urlsafe(48),
-                },
-            },
+            "usuarios": {**credenciales["usuarios"], **adicionales},
         }
     return credenciales
 
@@ -224,6 +230,7 @@ def _leer_o_generar_credenciales(ruta: Path) -> tuple[dict, str, str | None]:
                 bloque_anterior + _GUIA_LOCAL_ANTERIOR_FASE4A,
                 bloque_anterior + _GUIA_LOCAL_ANTERIOR_FASE4B,
                 bloque_anterior + _GUIA_LOCAL_ANTERIOR_FASE4C,
+                bloque_anterior + _GUIA_LOCAL,
                 bloque_actual,
                 _renderizar(datos),
             }
@@ -319,7 +326,7 @@ class Command(BaseCommand):
             elif estado_archivo == "actualizar":
                 _actualizar_guia_local(ruta, contenido_anterior or "", credenciales)
         self.stdout.write(self.style.SUCCESS(
-            "Datos demo locales listos: 7 cuentas, 2 empresas, 4 sedes, 6 canchas, 22 tarifas "
+            "Datos demo locales listos: 8 cuentas, 2 empresas, 4 sedes, 6 canchas, 22 tarifas "
             "y 12 medios de pago ficticios. Las contraseñas están solo "
             "en docs/USUARIOS_PRUEBA_LOCAL.md."
         ))

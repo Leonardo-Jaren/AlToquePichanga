@@ -116,7 +116,7 @@ def test_creacion_idempotente_y_password_local_estable(monkeypatch, tmp_path):
 
     assert credenciales_segunda == credenciales_primera
     assert "Comprobaciones manuales de Fase 4B" in ruta.read_text(encoding="utf-8")
-    assert User.objects.count() == 7
+    assert User.objects.count() == 8
     assert Empresa.objects.filter(descripcion__startswith=MARCA).count() == 2
     assert Sede.objects.filter(descripcion__startswith=MARCA).count() == 4
     assert Cancha.objects.filter(descripcion__startswith=MARCA).count() == 6
@@ -165,7 +165,7 @@ def test_migra_guia_de_seis_roles_sin_cambiar_contrasenas_existentes(monkeypatch
         **credenciales,
         "usuarios": {
             rol: datos for rol, datos in credenciales["usuarios"].items()
-            if rol != "jugador_b"
+            if rol not in {"jugador_b", "cajero_a_norte"}
         },
     }
     ruta.write_text(
@@ -178,14 +178,17 @@ def test_migra_guia_de_seis_roles_sin_cambiar_contrasenas_existentes(monkeypatch
 
     actualizado = _leer_archivo(ruta)
     assert set(actualizado["usuarios"]) == set(CORREOS)
-    for rol in set(CORREOS) - {"jugador_b"}:
+    roles_existentes = set(CORREOS) - {"jugador_b", "cajero_a_norte"}
+    for rol in roles_existentes:
         assert actualizado["usuarios"][rol] == credenciales["usuarios"][rol]
+    assert actualizado["usuarios"]["cajero_a_norte"]["correo"] == CORREOS["cajero_a_norte"]
     assert actualizado["usuarios"]["jugador_b"]["correo"] == CORREOS["jugador_b"]
     assert User.objects.get(email=CORREOS["jugador_b"]).check_password(
         actualizado["usuarios"]["jugador_b"]["contrasena"]
     )
+    cuentas_nuevas = {CORREOS["jugador_b"], CORREOS["cajero_a_norte"]}
     for correo, hash_guardado in hash_original.items():
-        if correo != CORREOS["jugador_b"]:
+        if correo not in cuentas_nuevas:
             assert User.objects.get(email=correo).password == hash_guardado
 
 
@@ -260,6 +263,7 @@ def test_todas_las_cuentas_activas_entran_por_login_normal(monkeypatch, tmp_path
         "dueno_b": (False, [RolEmpresa.DUENO], "dueno"),
         "admin_a": (False, [RolEmpresa.ADMINISTRADOR_SEDE], "administrador_sede"),
         "cajero_a": (False, [RolEmpresa.CAJERO], "cajero"),
+        "cajero_a_norte": (False, [RolEmpresa.CAJERO], "cajero"),
         "jugador": (False, [], "jugador"),
     }
 
@@ -325,10 +329,15 @@ def test_membresias_y_asignaciones_demo_son_activas(monkeypatch, tmp_path):
         usuario__email=CORREOS["dueno_a"], empresa__nombre__contains="Pichanga A",
         rol=RolEmpresa.DUENO, activa=True,
     ).exists()
-    for clave, rol in (("admin_a", RolEmpresa.ADMINISTRADOR_SEDE), ("cajero_a", RolEmpresa.CAJERO)):
+    asignaciones = (
+        ("admin_a", RolEmpresa.ADMINISTRADOR_SEDE, "Sede A Centro"),
+        ("cajero_a", RolEmpresa.CAJERO, "Sede A Centro"),
+        ("cajero_a_norte", RolEmpresa.CAJERO, "Sede A Norte"),
+    )
+    for clave, rol, sede in asignaciones:
         assert MembresiaEmpresa.objects.filter(
             usuario__email=CORREOS[clave], rol=rol, activa=True,
-            sedes_asignadas__sede__nombre=f"{MARCA} Sede A Centro",
+            sedes_asignadas__sede__nombre=f"{MARCA} {sede}",
             sedes_asignadas__activa=True,
         ).exists()
     assert not MembresiaEmpresa.objects.filter(usuario__email=CORREOS["jugador"]).exists()
